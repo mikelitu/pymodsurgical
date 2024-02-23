@@ -2,8 +2,6 @@ import cv2
 import numpy as np
 from pathlib import Path, PosixPath
 from enum import Enum
-import matplotlib.pyplot as plt
-import json
 import torch
 
 class VideoType(str, Enum):
@@ -21,7 +19,7 @@ class VideoReader(object):
     def __init__(
         self,
         video_path: str | PosixPath,
-        video_type: VideoType | str = VideoType.MONO,
+        video_config: dict[str, VideoType | str | PosixPath],
         return_type: RetType | str = RetType.NUMPY,
     ) -> None:
         
@@ -30,8 +28,9 @@ class VideoReader(object):
 
         self.cap = self._open_video(video_path)
         self.video_path = video_path
+        self.video_config = video_config
         self.video_length = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        self.video_type = video_type
+        self.video_type = video_config[video_path.stem]["video_type"]
         self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         self._reading_method = self._read_mono if self.video_type == VideoType.MONO else self._read_stereo
@@ -105,13 +104,21 @@ class VideoReader(object):
         else:
             raise ValueError(f"Frame number out of range, for video of length {self.video_length}")
     
-    def _return_numpy(self, frames: list[np.ndarray] | tuple[list[np.ndarray], list[np.ndarray]]) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    def _return_numpy(
+        self, 
+        frames: list[np.ndarray] | tuple[list[np.ndarray], list[np.ndarray]]
+    ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+        
         if isinstance(frames, tuple):
             return np.stack(frames[0]), np.stack(frames[1])
         else:
             return np.stack(frames)
         
-    def _return_tensor(self, frames: list[np.ndarray] | tuple[list[np.ndarray], list[np.ndarray]]) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
+    def _return_tensor(
+        self, 
+        frames: list[np.ndarray] | tuple[list[np.ndarray], list[np.ndarray]]
+    ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
+        
         if isinstance(frames, tuple):
             left_frames = [torch.tensor(frame).permute(2, 0, 1) for frame in frames[0]]
             right_frames = [torch.tensor(frame).permute(2, 0, 1) for frame in frames[1]]
@@ -120,13 +127,16 @@ class VideoReader(object):
             frames = [torch.tensor(frame).permute(2, 0, 1) for frame in frames]
             return torch.stack(frames)
         
-    def _return_list(self, frames: list[np.ndarray] | tuple[list[np.ndarray], list[np.ndarray]]) -> list[np.ndarray] | tuple[list[np.ndarray], list[np.ndarray]]:
+    def _return_list(
+        self, 
+        frames: list[np.ndarray] | tuple[list[np.ndarray], list[np.ndarray]]
+    ) -> list[np.ndarray] | tuple[list[np.ndarray], list[np.ndarray]]:
         return frames
     
     def _close(self) -> None:
         self.cap.release()
     
-    def _open_video(self, video_path) -> cv2.VideoCapture:
+    def _open_video(self, video_path: PosixPath | str) -> cv2.VideoCapture:
         return cv2.VideoCapture(str(video_path))
     
     def __len__(self) -> int:
