@@ -71,11 +71,12 @@ def calculate_deformation_map(
     Calculate the deformation map from the mode shape and displacement.
     """
 
-    # Calculate the modal coordinate
+    # Calculate the modal coordinate and reshape for multiplication
     modal_coordinates = calculate_modal_coordinate(mode_shape, displacement, pixel, alpha)
+    modal_coordinates = modal_coordinates.unsqueeze(-1).unsqueeze(-1)
     # Normalize the modal coordinate
     # normalized_modal_coordinates = normalize_modal_coordinate(modal_coordinates)
-    # Calculate the deformation map
-    deformation_maps = (mode_shape * modal_coordinates.unsqueeze(-1).unsqueeze(-1)).real.sum(dim=0)
-    norm_deformation_maps = (deformation_maps - deformation_maps.min()) / (deformation_maps.max() - deformation_maps.min())
-    return norm_deformation_maps, modal_coordinates
+    # Calculate the deformation map by weighting the mode shape by the modal coordinate
+    deformation_maps = (mode_shape * modal_coordinates).abs().sum(dim=0)
+    # norm_deformation_maps = (deformation_maps - deformation_maps.min()) / (deformation_maps.max() - deformation_maps.min())
+    return deformation_maps, modal_coordinates

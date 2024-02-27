@@ -17,6 +17,14 @@ def complex_from_magnitude_phase(magnitude: torch.Tensor, phase: torch.Tensor) -
     imag_part = magnitude * torch.sin(phase)
     return real_part + 1j * imag_part
 
+def complex_to_magnitude_phase(complex_tensor: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Convert a complex tensor to polar coordinates.
+    """
+    magnitude = torch.abs(complex_tensor)
+    phase = torch.angle(complex_tensor)
+    return magnitude, phase
+
 def motion_spectrum_2_complex(
     motion_spectrum: torch.Tensor | tuple[torch.Tensor, torch.Tensor]
 ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
@@ -95,6 +103,7 @@ def plot_modal_coordinates(
     fig.suptitle(f"Displacement: ({displacement[0]}, {displacement[1]}) Pixel: ({pixel[0]}, {pixel[1]})")
     plt.show()
 
+
 def save_modal_coordinates(
     modal_coordinates: torch.Tensor,
     save_dir: str | PosixPath = "./",
@@ -118,7 +127,7 @@ def save_modal_coordinates(
     save_dir.mkdir(exist_ok=True, parents=True)
     
 
-    np.save(save_dir/f"disp_{displacement[0].real}_{displacement[1].real}_px_{pixel[0]}_{pixel[1]}.npy", modal_coordinates)
+    np.save(save_dir/f"disp_{round(displacement[0].real.item(), 2)}_{round(displacement[1].real.item(), 2)}_px_{pixel[0]}_{pixel[1]}.npy", modal_coordinates)
 
 def load_modal_coordinates(
     path: str
