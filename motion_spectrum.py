@@ -83,3 +83,15 @@ def save_motion_spectrum(
         print("Saving motion spectrum to: ", save_dir)
         img_motion_spectrum_X, img_motion_spectrum_Y = motion_spectrum_2_grayimage(motion_spectrum)
         plot_and_save([img_motion_spectrum_X, img_motion_spectrum_Y], save_dir, cmap="plasma")
+    
+def resize_spectrum_2_reference(
+    motion_spectrum: torch.Tensor | tuple[torch.Tensor, torch.Tensor],
+    reference_frame: np.ndarray
+) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
+    
+    if isinstance(motion_spectrum, tuple):
+        motion_spectrum = (torch.nn.functional.interpolate(motion_spectrum[0], size=(reference_frame.shape[0], reference_frame.shape[1]), mode="bilinear"), torch.nn.functional.interpolate(motion_spectrum[1], size=(reference_frame.shape[0], reference_frame.shape[1]), mode="bilinear"))
+    else:
+        motion_spectrum = torch.nn.functional.interpolate(motion_spectrum, size=(reference_frame.shape[0], reference_frame.shape[1]), mode="bilinear")
+    
+    return motion_spectrum

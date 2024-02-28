@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from complex import normalize_modal_coordinate, complex_from_magnitude_phase
+from complex import complex_from_magnitude_phase, normalize_modal_coordinate
 
 def calculate_modal_coordinate(
     mode_shape: torch.Tensor, 
@@ -67,6 +67,7 @@ def calculate_deformation_map(
     pixel: tuple[int, int],
     alpha: float = 1.0
 ) -> tuple[torch.Tensor, torch.Tensor]:
+    
     """
     Calculate the deformation map from the mode shape and displacement.
     """
@@ -74,9 +75,8 @@ def calculate_deformation_map(
     # Calculate the modal coordinate and reshape for multiplication
     modal_coordinates = calculate_modal_coordinate(mode_shape, displacement, pixel, alpha)
     modal_coordinates = modal_coordinates.unsqueeze(-1).unsqueeze(-1)
-    # Normalize the modal coordinate
-    # normalized_modal_coordinates = normalize_modal_coordinate(modal_coordinates)
+    # modal_coordinates = normalize_modal_coordinate(modal_coordinates)
+
     # Calculate the deformation map by weighting the mode shape by the modal coordinate
-    deformation_maps = (mode_shape * modal_coordinates).abs().sum(dim=0)
-    # norm_deformation_maps = (deformation_maps - deformation_maps.min()) / (deformation_maps.max() - deformation_maps.min())
+    deformation_maps = (mode_shape * modal_coordinates).real.sum(dim=0)
     return deformation_maps, modal_coordinates
