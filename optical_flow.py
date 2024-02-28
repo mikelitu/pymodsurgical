@@ -7,6 +7,54 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import PosixPath
 
+def make_grid(img: torch.Tensor, device: torch.device = torch.device("cpu")) -> torch.Tensor:
+    """
+    Create a grid of the same size as the input image.
+
+    Args:
+        img (torch.Tensor): Image tensor of shape (C, H, W) and dtype torch.float.
+
+    Returns:
+        grid (torch.Tensor): Grid tensor of shape (2, H, W) and dtype torch.float.
+    """
+    B, _, H, W = img.shape
+    xx = torch.arange(0, W).view(1, -1).repeat(H, 1).to(device)
+    yy = torch.arange(0, H).view(-1, 1).repeat(1, W).to(device)
+    xx = xx.view(1, 1, H, W).repeat(B, 1, 1, 1)
+    yy = yy.view(1, 1, H, W).repeat(B, 1, 1, 1)
+    return torch.cat((xx, yy), dim=1).float().to(img.device)
+
+
+def warp_flow(img: torch.Tensor, flow: torch.Tensor) -> np.ndarray:
+    """
+    Warp an image using a flow field.
+
+    Args:
+        img (torch.Tensor): Image tensor of shape (C, H, W) and dtype torch.float.
+        flow (torch.Tensor): Flow tensor of shape (2, H, W) and dtype torch.float.
+
+    Returns:
+        warped_img (torch.Tensor): Warped image tensor of shape (C, H, W) and dtype torch.float.
+    """
+    if len(img.shape) == 3:
+        img = img.unsqueeze(0)
+    if len(flow.shape) == 3:
+        flow = flow.unsqueeze(0)
+
+    _, _, H, W = img.shape
+    grid = make_grid(img)
+    grid = grid + flow
+    # Scale the grid to [-1, 1]
+    grid[:, 0, :, :] = 2.0 * grid[:, 0, :, :] / max(W - 1, 1) - 1.0
+    grid[:, 1, :, :] = 2.0 * grid[:, 1, :, :] / max(H - 1, 1) - 1.0
+    grid = grid.permute(0, 2, 3, 1)
+    img = img / 255.
+    warped_img = torch.nn.functional.grid_sample(img, grid, mode="bicubic", padding_mode="border", align_corners=False)
+    warped_img = warped_img.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
+    # warped_img = np.clip(warped_img, 0, 1)
+    warped_img = (warped_img * 255).astype(np.uint8)
+    return warped_img
+
 
 def plot_and_save(imgs: list[torch.Tensor] | torch.Tensor, filename: PosixPath | None = None, **imshow_kwargs):
     if not isinstance(imgs, list):
@@ -55,32 +103,6 @@ def motion_spectrum_2_grayimage(motion_spectrum: torch.Tensor) -> torch.Tensor:
     motion_spectrum = motion_spectrum / (max_norm + epsilon)
     # img = _normalized_motion_spectrum_to_image(motion_spectrum)
     return motion_spectrum[:, 0], motion_spectrum[:, 1]
-
-
-def _normalized_motion_spectrum_to_image(motion_spectrum: torch.Tensor) -> torch.Tensor:
-
-    N, _, H, W = motion_spectrum.shape
-    device = motion_spectrum.device
-    motion_spectrum_img = torch.zeros((N, 3, H, W), dtype=torch.uint8).to(device)
-    colorwheel = _make_colorwheel().to(device) # (55, 3)
-    num_cols = colorwheel.shape[0] # 55
-    norm = torch.sum(motion_spectrum**2, dim=1).sqrt()
-    a = torch.atan2(-motion_spectrum[:, 1], -motion_spectrum[:, 0]) / torch.pi
-    fk = (a + 1) / 2 * (num_cols - 1)
-    k0 = torch.floor(fk).to(torch.long)
-    k1 = k0 + 1
-    k1[k1 == num_cols] = 0
-    f = fk - k0
-
-    for c in range(colorwheel.shape[1]):
-        tmp = colorwheel[:, c]
-        col0 = tmp[k0] / 255.0
-        col1 = tmp[k1] / 255.0
-        col = (1 - f) * col0 + f * col1
-        col = 1 - norm * (1 - col)
-        motion_spectrum_img[:, c] = torch.floor(255 * col)
-    
-    return motion_spectrum_img
 
 
 def load_flow_model(device: torch.device = torch.device("cuda:0")) -> torch.nn.Module:
