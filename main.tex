@@ -1,0 +1,59 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Welcome to Overleaf --- just edit your LaTeX on the left,
+% and we'll compile it for you on the right. If you open the
+% 'Share' menu, you can invite other users to edit at the same
+% time. See www.overleaf.com/learn for more info. Enjoy!
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\documentclass{article}
+\usepackage{amsmath}
+\title{Amsmath example}
+\author{Overleaf}
+\date{\today}
+\begin{document}
+\maketitle
+\section{Introduction}
+
+Dynamics under small deformations are well approximated by a system of masses, dampers and spring.
+
+\begin{equation*}
+    \mathbf{M\ddot{u}}(t) + \mathbf{C\dot{u}}(t) + \mathbf{Ku}(t) = \mathbf{f}(t)
+\end{equation*}
+
+where $\mathbf{\ddot{u}}(t)$, $\mathbf{\dot{u}}(t)$, and $\mathbf{u}(t)$ are vectors for acceleration, velocity and displacement. If we assume that the equation has a sinusoidal solution, the eigenmodes are orthogonal and given by $\mathbf{K} \phi_{i} = \omega^{2}_{i} \mathbf{M} \phi_{i}$. The set of eigenvectors $\phi_{1} \text{...} \phi_{N}$.
+
+\begin{equation*}
+    \mathbf{\Phi} = \left[\phi_{1} \quad \phi_{2} \quad \text{ ... } \quad \phi_{N}\right]
+\end{equation*}
+\begin{equation*}
+    \mathbf{\Phi}^{T}\mathbf{M\Phi} = diag(\mathbf{m}_{i})
+\end{equation*}
+\begin{equation*}
+    \mathbf{\Phi}^{T}\mathbf{K\Phi} = diag(\mathbf{k}_{i})
+\end{equation*}
+
+The matrix $\mathbf{\Phi}$ defines modal coordinates $\mathbf{q}(t)$ where $\mathbf{u}(t) = \mathbf{\Phi q}(t)$.
+\begin{equation*}
+    \mathbf{\ddot{q}}(t) + 2\xi_{i}\omega_{i}\mathbf{\dot{q}}(t) + \omega_{i}^{2}\mathbf{q}(t) = \frac{\mathbf{f_{i}}}{\mathbf{m_{i}}}
+\end{equation*}
+
+where the undamped natural frequency is $\omega_{i} = \sqrt{\frac{\mathbf{k_{i}}}{m_{i}}}$, giving the modal damping factor.
+
+\begin{equation*}
+    \xi_{i} = \frac{\mathbf{c_{i}}}{2\mathbf{m_{i}}\omega_{i}} = \frac{1}{2}\left(\frac{\alpha}{\omega_{i}} + \beta\omega_{i}\right)
+\end{equation*}
+
+We can obtain the unit impulse response for the $i^{th}$.
+
+\begin{equation*}
+    h_{i}(t) = \left(\frac{e^{-\xi_{i}\omega_{i}t}}{\mathbf{m_{i}}\omega_{di}}\right) sin{(\omega_{di}t)}
+\end{equation*}
+
+where the damped natural frequency is $\omega_{di} = \omega_{i} \sqrt{1 - \xi^{2}_{i}}$. Taking the Fourier transform of the unit impulse response $h_{i}(t)$.
+
+\begin{equation*}
+    H_{i}(\omega) = \left(\frac{1}{}\right)
+\end{equation*}
+
+\end{document}
