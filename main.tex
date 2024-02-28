@@ -8,20 +8,25 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \documentclass{article}
 \usepackage{amsmath}
-\title{Amsmath example}
-\author{Overleaf}
+\usepackage{cite}
+
+\title{Modal Analysis for Real Surgical Video}
+\author{Mikel De Iturrate Reyzabal}
 \date{\today}
 \begin{document}
 \maketitle
-\section{Introduction}
+\section{Objective}
 
-Dynamics under small deformations are well approximated by a system of masses, dampers and spring.
+The human body is in constant motion due to the natural forces on the body. One of the main features of these forces is their oscillatory nature. Internal organs and soft tissue are complex systems that can be modeled as a set of interconnected masses, dampers and springs. The dynamic behaviour of tissue can be used to learn about the elastic properties of the current surgical environment. In this project, we use short clips of naturally moving organs to learn the dynamic behaviour of the tissue. The goal is to learn the natural frequencies and damping factors of the tissue. This information can be used to determine the contact forces of instruments during surgical procedures, predict critical tissue deformations and detect anomalies in the tissue.
+
+\section{Mathematical derivation}
+Modal analysis has been broadly used in other applications such as FEM simulation and texture deformation in other areas \cite{reddy_junthula_introduction_2013,james_dyrt_2002,hauser_interactive_2003,huang_interactive_2011, li_space-time_2014}. This mathematical derivation is based on the work by Davis et al. \cite{davis_image-space_2015}. The motion of soft tissue under a force can be described by the following equation of motion:
 
 \begin{equation*}
     \mathbf{M\ddot{u}}(t) + \mathbf{C\dot{u}}(t) + \mathbf{Ku}(t) = \mathbf{f}(t)
 \end{equation*}
 
-where $\mathbf{\ddot{u}}(t)$, $\mathbf{\dot{u}}(t)$, and $\mathbf{u}(t)$ are vectors for acceleration, velocity and displacement. If we assume that the equation has a sinusoidal solution, the eigenmodes are orthogonal and given by $\mathbf{K} \phi_{i} = \omega^{2}_{i} \mathbf{M} \phi_{i}$. The set of eigenvectors $\phi_{1} \text{...} \phi_{N}$.
+where $\mathbf{\ddot{u}}(t)$, $\mathbf{\dot{u}}(t)$, and $\mathbf{u}(t)$ are vectors for acceleration, velocity and displacement. If we assume that the equation has a sinusoidal solution (oscillatory behaviour of body forces), the eigenmodes are orthogonal and given by $\mathbf{K} \phi_{i} = \omega^{2}_{i} \mathbf{M} \phi_{i}$. The set of eigenvectors $\phi_{1} \text{...} \phi_{N}$.
 
 \begin{equation*}
     \mathbf{\Phi} = \left[\phi_{1} \quad \phi_{2} \quad \text{ ... } \quad \phi_{N}\right]
@@ -44,7 +49,7 @@ where the undamped natural frequency is $\omega_{i} = \sqrt{\frac{\mathbf{k_{i}}
     \xi_{i} = \frac{\mathbf{c_{i}}}{2\mathbf{m_{i}}\omega_{i}} = \frac{1}{2}\left(\frac{\alpha}{\omega_{i}} + \beta\omega_{i}\right)
 \end{equation*}
 
-We can obtain the unit impulse response for the $i^{th}$.
+We can obtain the unit impulse response for the $i^{th}$ mode.
 
 \begin{equation*}
     h_{i}(t) = \left(\frac{e^{-\xi_{i}\omega_{i}t}}{\mathbf{m_{i}}\omega_{di}}\right) sin{(\omega_{di}t)}
@@ -53,7 +58,81 @@ We can obtain the unit impulse response for the $i^{th}$.
 where the damped natural frequency is $\omega_{di} = \omega_{i} \sqrt{1 - \xi^{2}_{i}}$. Taking the Fourier transform of the unit impulse response $h_{i}(t)$.
 
 \begin{equation*}
-    H_{i}(\omega) = \left(\frac{1}{}\right)
+    H_{i}(\omega) = \left(\frac{1}{\mathbf{m}_i\omega_{d_{i}}} \frac{\xi_{i}\omega_{i}}{\xi_{i}^{2}\omega_{i}^{2} + \omega^{2}}\right) \ast \left(\frac{\delta(\omega - \omega_{d_{i}}) - \delta(\omega + \omega_{d_{i}})}{i}\right)
 \end{equation*}
+
+The deformations oberseved in video can be related to projections of the mode shapes $\phi_{i}$. A force $\mathbf{f}$ given in modal coordinates can be decomposed into a set of previously defined impulses $\mathbf{f_{i}} = A_{i}h_{i}(t)$, where $A_{i}$ is the amplitude of the impulse at mode $\phi_{i}$. For a single deegree of freedom, the response of the object is given as:
+\begin{equation*}
+    u_{p}(t) = \sum_{i=1}^{N} A_{i}h_{i}(t)\phi_{i}(p)
+\end{equation*}
+
+consequently the Fourier transform of the response is given by:
+\begin{equation*}
+    U_{p}(\omega) = \sum_{i=1}^{N} A_{i}H_{i}(\omega)\phi_{i}(p)
+\end{equation*}
+
+We make the assumption that modes are well spaced, and non overlapping in the frequency domain. This allos, we can represent the frequency response at the damping frequency $\omega_{d_{i}}$ as:
+\begin{equation*}
+    U_{p}(\omega_{d_{i}}) = A_{i}H_{i}(\omega_{d_{i}})\phi_{i}(p)
+\end{equation*}
+
+For the image plane, we can project the mode shapes using the using a diagonal, binary, matrix $\mathbf{V}$ that represents the visible degrees of freedom of the object. Therefore, the projection of the mode shape $\phi_{i}$ is $\mathbf{V}\phi_{i}$. The projection of the response is given by:
+
+\begin{equation*}
+    \mathbf{V}\mathbf{U}(\omega_{d_{i}}) = A_{i}H_{i}(\omega_{d_{i}})\mathbf{V}\phi_{i}
+\end{equation*}
+
+Here, $A_{i}$ and $H_{i}(\omega_{d_{i}})$ are constant across all degress of freedom $p$, meaning that $\mathbf{V}\mathbf{U}(\omega_{d_{i}}) \propto \mathbf{V}\phi_{i}$ . Therefore, we can treat the set of complex $\phi'_{i}$, the values of $\mathbf{V}\phi_{i}$ measured in video, as a basis for the motion of the object in the image plane.
+
+\section*{Algorithm}
+The algorithm is divided into two main parts: the extraction of the mode shapes from the video, and the estimation of tissue motion under a user input displacement. 
+
+\subsection*{Mode shape extraction}
+We calculate the optical flow in the x and y direction of the video using a deep learning approach, more specifically the RAFT module \cite{teed_raft_2020}. To filter local displacements, we use a weighted gaussian filtering. Local displacements are first given weights proportional to local contrast. The weighted displacements are then filtered using a gaussian kernel. Next, we compute the temporal FFT of the filtered displacements. This gives us the list of possible shape candidates. However, as soft tissue naturally oscillates at low frequencies, we decided to keep the first user selected $K$ modes. For this example, we will set $K=16$, following recent literature \cite{li_generative_2023}, giving us the set of complex mode shapes $\phi'_{i}$.
+
+\subsection*{Estimation of tissue motion}
+We manually select a point in the image $\mathbf{p}$ and a direction $\mathbf{d}$. Therefore, the magnitude of the modal coordinate is calculated by:
+\begin{equation*}
+    \|\mathbf{q_{i}}\| = \|\mathbf{d^{T}}\phi'_{i}(\mathbf{p})\|
+\end{equation*}
+We set the phase of the modal coordinate to either maximize the displacement or the velocity of $\mathbf{p}$ in the direction $\mathbf{d}$. The phase of the modal coordinate is given by:
+\begin{equation*}
+    \text{Max Displacement:} \quad Arg(\mathbf{q_{i}}) = -Arg(\mathbf{d^{T}}\phi'_{i}(\mathbf{p}))
+\end{equation*}
+\begin{equation*}
+    \text{Max Velocity:} \quad Arg(\mathbf{q_{i}}) = -Arg(\mathbf{d^{T}}\phi'_{i}(\mathbf{p})) + \frac{\pi}{2}
+\end{equation*}
+
+Using all of this information, we can estimate the optical flow of a resting state single color image to a given position. The displacement field $\mathbf{D}(t)$ \cite{chuang_animating_2005} is given by:
+\begin{equation*}
+    \mathbf{D}(t) = \sum_{i=1}^{K} \mathbf{Re}\{\phi'_{i}q_{i}(t)\}
+\end{equation*}
+
+\section*{Current limitations}
+The current approach presents the current main limitations:
+\begin{itemize}
+    \item The current set up does not consider the motion of the camera. Moving cameras can introduce a significant change in the optical flow and change the current view of the tissue. This will make that the calculated mode shapes are not representative of the tissue motion in the new view. 
+    \item The current approach does not consider the effect of the instruments in the tissue. The instruments can introduce significant changes in the tissue motion, and can introduce significant noise in the estimation of the mode shape, due to their rigid motion.
+    \item The motion of the tissue must be small. The current approach assumes that the motion of the tissue is small, and that the tissue is not significantly deformed. This is a significant limitation, as the motion of the tissue can be large, and the tissue can be significantly deformed.
+    \item The current model only considers motion on the image plane. This is a significant limitation, as the motion of the tissue can be in 3D, and the tissue can be significantly deformed in the z direction. We could solve this by introducing the depth map of the video, and estimate the motion of the tissue in 3D.
+\end{itemize}
+
+\section*{Future work}
+The main objective of the work must be to find a way to confidently calculate the forces applied to the tissue at a given time $t$ knowing the displacement of tissue and the complex mode shapes. We could start by considering a point force at a given point $\mathbf{p}$ in the image plane and a direction $\mathbf{d}$. As the complex mode shape $\phi'_{i}$ is a basis for the motion of the object in the image plane and is linearly related to the response of the object, we can define the point force as:
+\begin{equation*}
+    \mathbf{f_{i}} = \|\mathbf{d^{T}}\phi'_{i}(\mathbf{p})\|
+\end{equation*}
+
+The questions to answer at this point are:
+\begin{itemize}
+    \item How can we calculate the force applied to the entire visible tissue at a given time $t$ knowing the displacement of tissue (optical flow) and the complex mode shapes?
+    \item Can we determine the contact forces of instruments during surgical procedures using the complex mode shapes?
+    \item Can we predict critical deformations using the complex mode shapes?
+    \item Can we detect anomalies in the tissue using the complex mode shapes?
+\end{itemize}
+
+\newpage
+\bibliography{references}
+\bibliographystyle{ieeetr}
 
 \end{document}
