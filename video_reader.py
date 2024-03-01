@@ -36,7 +36,11 @@ class VideoReader(object):
         self._reading_method = self._read_mono if self.video_type == VideoType.MONO else self._read_stereo
         self._frame_reading_method = self._read_mono_frame if self.video_type == VideoType.MONO else self._read_stereo_frame
         self._return_func = {RetType.NUMPY: self._return_numpy, RetType.TENSOR: self._return_tensor, RetType.LIST: self._return_list}[return_type]
-    
+        self._left_calibration_matrix = np.array(video_config[video_path.stem]["left_calibration_matrix"][:9]).reshape(3, 3)
+        self._left_distortion_coefficients = np.array(video_config[video_path.stem]["left_calibration_matrix"][9:])
+        self._right_calibration_matrix = np.array(video_config[video_path.stem]["right_calibration_matrix"][:9]).reshape(3, 3)
+        self._right_distortion_coefficients = np.array(video_config[video_path.stem]["right_calibration_matrix"][9:])
+
     def _read_mono(self, start: int = 0, end: int = 0) -> list[np.ndarray]:
         if end == 0:
             end = self.video_length
@@ -104,6 +108,8 @@ class VideoReader(object):
         else:
             raise ValueError(f"Frame number out of range, for video of length {self.video_length}")
     
+   
+    
     def _return_numpy(
         self, 
         frames: list[np.ndarray] | tuple[list[np.ndarray], list[np.ndarray]]
@@ -142,3 +148,68 @@ class VideoReader(object):
     def __len__(self) -> int:
         return self.video_length
     
+    @property
+    def left_fx(self) -> float:
+        return self._left_calibration_matrix[0, 0]
+    
+    @property
+    def left_fy(self) -> float:
+        return self._left_calibration_matrix[1, 1]
+    
+    @property
+    def left_cx(self) -> float:
+        return self._left_calibration_matrix[0, 2]
+    
+    @property
+    def left_cy(self) -> float:
+        return self._left_calibration_matrix[1, 2]
+    
+    @property
+    def right_fx(self) -> float:
+        return self._right_calibration_matrix[0, 0]
+    
+    @property
+    def right_fy(self) -> float:
+        return self._right_calibration_matrix[1, 1]
+    
+    @property
+    def right_cx(self) -> float:
+        return self._right_calibration_matrix[0, 2]
+    
+    @property
+    def right_cy(self) -> float:
+        return self._right_calibration_matrix[1, 2]
+    
+    @property
+    def baseline(self) -> float:
+        return abs(self._stereo_calibration_matrix[3, 0])
+    
+    @property
+    def left_calibration_mat(self) -> np.ndarray:
+        return self._left_calibration_matrix
+    
+    @property
+    def right_calibration_mat(self) -> np.ndarray:
+        return self._right_calibration_matrix
+    
+    @property
+    def stereo_calibration_mat(self) -> np.ndarray:
+        return self._stereo_calibration_matrix
+    
+    @property
+    def stereo_rotation_mat(self) -> np.ndarray:
+        return self._stereo_calibration_matrix[:3, :3]
+    
+    @property
+    def stereo_translation_mat(self) -> np.ndarray:
+        return self._stereo_calibration_matrix[3, :3]
+    
+
+if __name__ == "__main__":
+    import json
+    video_path = "videos/liver_stereo.avi"
+    with open("videos/metadata.json", "r") as f:
+        video_config = json.load(f)
+    
+    video_reader = VideoReader(video_path, video_config, return_type=RetType.NUMPY)
+    # video_reader.visualize_disparity(0)
