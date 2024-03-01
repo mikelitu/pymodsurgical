@@ -25,7 +25,15 @@ def make_grid(img: torch.Tensor, device: torch.device = torch.device("cpu")) -> 
     return torch.cat((xx, yy), dim=1).float().to(img.device)
 
 
-def warp_flow(img: torch.Tensor, flow: torch.Tensor) -> np.ndarray:
+def warp_flow(
+    img: torch.Tensor, 
+    flow: torch.Tensor, 
+    depth_map: np.ndarray,
+    mask: np.ndarray | None = None, 
+    near: float = 0.05, 
+    far: float = 0.95
+) -> np.ndarray:
+    
     """
     Warp an image using a flow field.
 
@@ -36,22 +44,42 @@ def warp_flow(img: torch.Tensor, flow: torch.Tensor) -> np.ndarray:
     Returns:
         warped_img (torch.Tensor): Warped image tensor of shape (C, H, W) and dtype torch.float.
     """
+    
     if len(img.shape) == 3:
         img = img.unsqueeze(0)
     if len(flow.shape) == 3:
         flow = flow.unsqueeze(0)
+    
+    depth_map = torch.from_numpy(depth_map).unsqueeze(0).to(flow.device)
+
+    if mask is not None:
+        mask = torch.from_numpy(mask).unsqueeze(0).unsqueeze(0).to(flow.device)
 
     _, _, H, W = img.shape
     grid = make_grid(img)
     grid = grid + flow
+    # Perform depth culling based on near and far thresholds
+    culled_depth_map = torch.where((depth_map >= near) &
+                                   (depth_map <= far),
+                                   depth_map, torch.zeros_like(depth_map))
+    
+    # Normalize culled depth map to range [0, 1]
+    culled_depth_map = culled_depth_map / culled_depth_map.max()
+
     # Scale the grid to [-1, 1]
     grid[:, 0, :, :] = 2.0 * grid[:, 0, :, :] / max(W - 1, 1) - 1.0
     grid[:, 1, :, :] = 2.0 * grid[:, 1, :, :] / max(H - 1, 1) - 1.0
     grid = grid.permute(0, 2, 3, 1)
     img = img / 255.
-    warped_img = torch.nn.functional.grid_sample(img, grid, mode="bicubic", padding_mode="border", align_corners=False)
+    warped_img = torch.nn.functional.grid_sample(img, grid, mode="bicubic", padding_mode="reflection", align_corners=True)
+    warped_mask = torch.nn.functional.grid_sample(mask, grid, mode="nearest", padding_mode="reflection", align_corners=True) if mask is not None else None
+    if warped_mask is not None:
+        warped_img = warped_img * warped_mask
+
+    warped_img = culled_depth_map * warped_img
+
     warped_img = warped_img.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
-    # warped_img = np.clip(warped_img, 0, 1)
+    warped_img = np.clip(warped_img, 0., 1.)
     warped_img = (warped_img * 255).astype(np.uint8)
     return warped_img
 
@@ -182,10 +210,10 @@ def motion_texture_from_flow_field(
             y_t = flow_field[:, :, 1, i, j]
             Y_f = torch.fft.rfft(x_t, timestep, dim=-1)
             X_f = torch.fft.rfft(y_t, timestep, dim=-1)
-            motion_texture[:, :, 0, i, j] = (1.0 / K) * X_f[:, :K].real
-            motion_texture[:, :, 1, i, j] = (1.0 / K) * X_f[:, :K].imag
-            motion_texture[:, :, 2, i, j] = (1.0 / K) * Y_f[:, :K].real
-            motion_texture[:, :, 3, i, j] = (1.0 / K) * Y_f[:, :K].imag
+            motion_texture[:, :, 0, i, j] = (1.0 / K) * X_f[:, 1:K+1].real
+            motion_texture[:, :, 1, i, j] = (1.0 / K) * X_f[:, 1:K+1].imag
+            motion_texture[:, :, 2, i, j] = (1.0 / K) * Y_f[:, 1:K+1].real
+            motion_texture[:, :, 3, i, j] = (1.0 / K) * Y_f[:, 1:K+1].imag
 
     return motion_texture
 

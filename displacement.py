@@ -13,6 +13,9 @@ def calculate_modal_coordinate(
     Calculate the modal coordinate from the mode shape and displacement.
     """
 
+    if len(mode_shape.shape) == 3:
+        mode_shape = mode_shape.unsqueeze(0)
+        
     # Calculate the magnitude of the vector
     magnitude = calculate_modal_magnitude(mode_shape, displacement, pixel, alpha)
     # Calculate the phase of the vector

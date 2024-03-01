@@ -61,6 +61,13 @@ class Masking(object):
         
         masked_frames = self.apply_mask(frames)
         return masked_frames
+    
+    @property
+    def masking(self) -> np.ndarray:
+        if self.video_type == VideoType.STEREO:
+            return self.left_mask
+        else:
+            return self.mask
 
     @staticmethod
     def _load_mask(mask_path: PosixPath | str) -> np.ndarray:
