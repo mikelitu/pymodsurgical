@@ -36,10 +36,14 @@ class VideoReader(object):
         self._reading_method = self._read_mono if self.video_type == VideoType.MONO else self._read_stereo
         self._frame_reading_method = self._read_mono_frame if self.video_type == VideoType.MONO else self._read_stereo_frame
         self._return_func = {RetType.NUMPY: self._return_numpy, RetType.TENSOR: self._return_tensor, RetType.LIST: self._return_list}[return_type]
-        self._left_calibration_matrix = np.array(video_config[video_path.stem]["left_calibration_matrix"][:9]).reshape(3, 3)
-        self._left_distortion_coefficients = np.array(video_config[video_path.stem]["left_calibration_matrix"][9:])
-        self._right_calibration_matrix = np.array(video_config[video_path.stem]["right_calibration_matrix"][:9]).reshape(3, 3)
-        self._right_distortion_coefficients = np.array(video_config[video_path.stem]["right_calibration_matrix"][9:])
+        
+        try:
+            self._left_calibration_matrix = np.array(video_config[video_path.stem]["left_calibration_matrix"][:9]).reshape(3, 3)
+            self._left_distortion_coefficients = np.array(video_config[video_path.stem]["left_calibration_matrix"][9:])
+            self._right_calibration_matrix = np.array(video_config[video_path.stem]["right_calibration_matrix"][:9]).reshape(3, 3)
+            self._right_distortion_coefficients = np.array(video_config[video_path.stem]["right_calibration_matrix"][9:])
+        except Exception:
+            print("Calibration cofficients not found in metadata...")
 
     def _read_mono(self, start: int = 0, end: int = 0) -> list[np.ndarray]:
         if end == 0:
