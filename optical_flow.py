@@ -71,8 +71,8 @@ def warp_flow(
     grid[:, 1, :, :] = 2.0 * grid[:, 1, :, :] / max(H - 1, 1) - 1.0
     grid = grid.permute(0, 2, 3, 1)
     img = img / 255.
-    warped_img = torch.nn.functional.grid_sample(img, grid, mode="bicubic", padding_mode="reflection", align_corners=True)
-    warped_mask = torch.nn.functional.grid_sample(mask, grid, mode="nearest", padding_mode="reflection", align_corners=True) if mask is not None else None
+    warped_img = torch.nn.functional.grid_sample(img, grid, mode="bicubic", padding_mode="zeros", align_corners=True)
+    warped_mask = torch.nn.functional.grid_sample(mask, grid, mode="nearest", padding_mode="zeros", align_corners=True) if mask is not None else None
     if warped_mask is not None:
         warped_img = warped_img * warped_mask
 
