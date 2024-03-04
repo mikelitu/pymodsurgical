@@ -8,7 +8,6 @@ import json
 from pathlib import Path, PosixPath
 from masking import Masking
 import math
-from torchvision.utils import flow_to_image
 from optical_flow import warp_flow
 import numpy as np
 import torch.nn as nn
@@ -17,11 +16,15 @@ from dataclasses import dataclass, field
 from pyOpenHaptics.hd_device import HapticDevice
 import pyOpenHaptics.hd as hd
 from pyOpenHaptics.hd_callback import hd_callback
+import time
+from depth import calculate_depth_map, load_depth_model_and_transform, apply_depth_culling, ModelType
 
+rad = math.pi / 180
 
 @dataclass
 class DeviceState:
     button: bool = False
+    pre_button: bool = False
     position: list = field(default_factory=list)
     force: list = field(default_factory=list)
 
@@ -35,16 +38,12 @@ def device_callback():
     """
     # Get the current position of the device
     transform = hd.get_transform()
-    device_state.position = [transform[3][0], -transform[3][1], transform[3][2]]
+    device_state.position = [transform[3][0], transform[3][1], transform[3][2]]
     # Set the force to the device
     hd.set_force(device_state.force)
     # Get the current state of the device buttons
     button = hd.get_buttons()
     device_state.button = True if button == 1 else False
-
-from depth import calculate_depth_map, load_depth_model_and_transform, apply_depth_culling, ModelType
-
-rad = math.pi / 180
 
 class ControlType(StrEnum):
     MOUSE = "mouse"
@@ -65,12 +64,18 @@ class InteractiveDemo(object):
     ) -> None:
 
         frames = self._init_video_reader(video_path, start, end)
-        self.reference_frame = self.video_reader.read_frame(0)[0]
+        
+        if isinstance(frames, tuple):
+            self.reference_frame = self.video_reader.read_frame(0)[0]
+        else:
+            self.reference_frame = self.video_reader.read_frame(0)
+
         self.depth_map = self._get_depth_map(self.reference_frame, depth_model_type)
         
         # Normalize depth map for depth culling
         self.depth_map = (self.depth_map - self.depth_map.min()) / (self.depth_map.max() - self.depth_map.min())
-        display_frame = apply_depth_culling(self.depth_map[0], self.reference_frame[0])
+        display_frame = apply_depth_culling(self.depth_map[0], self.reference_frame)
+        # display_frame = apply_depth_culling(self.depth_map[0], self.reference_frame[0])
         self._get_motion_spectrum_from_video(frames, K, filtering, masking)
         self._control_func = {ControlType.MOUSE: self.mouse_control, ControlType.HAPTIC: self.haptic_control}[control_type]
         self.control_type = control_type
@@ -78,6 +83,8 @@ class InteractiveDemo(object):
         
         if control_type == ControlType.HAPTIC:
             self._init_haptic_device()
+            self.haptic_limits = torch.tensor([[-210.0, 216.0], [27.7, 330.0]])
+            self.force_limits = torch.tensor([[-1.0, 1.0], [-1.0, 1.0]])        
             
 
     def _init_pygame(
@@ -102,29 +109,94 @@ class InteractiveDemo(object):
         self.clock = pygame.time.Clock()
         self.displacement = torch.tensor([0, 0])
     
+
     def _init_haptic_device(
         self
     ) -> None:
         """
         Initialize the haptic device.
         """
+        global device_state
         device_state = DeviceState()
         self.device = HapticDevice(device_name="Default Device", callback=device_callback)
-    
+        # Let the callback run for a bit to get the initial state of the device
+        time.sleep(0.1)
+        # Start a loop so the user sets the desired intial position
+        print("Set the initial position of the device. Move the device to the following position: [0., 175.]")
+        
+        precision_range = 1.0
+        self.backoff_count = 0
+
+        try:
+            while True:
+                print("Current position: ", device_state.position[:2])
+                diff_x = abs(device_state.position[0] + 0)
+                diff_y = abs(device_state.position[1] - 175.0)
+                if diff_x < precision_range and diff_y < precision_range:
+                    self.init_position = torch.tensor(device_state.position[:2])
+                    self.pre_button = False
+                    break
+                
+                time.sleep(0.1)
+        
+        except Exception as e:
+            self.backoff_count += 1
+            print("Connecting to the device...")
+            time.sleep(0.5)
+            if self.backoff_count == 10:
+                print("An exception occurred. Closing the device...")
+                self.device.close()
+                raise(e)
+
+
+    def _scale_haptic_2_screen(
+        self,
+        position: torch.Tensor
+    ) -> tuple[int, int]:
+        """
+        Scale the haptic position to the screen size.
+        """
+        width, height = pygame.display.get_surface().get_size()
+        pos_x = ((position[0] - self.haptic_limits[0][0]) / (self.haptic_limits[0][1] - self.haptic_limits[0][0])) * width
+        pos_y = height - ((position[1] - self.haptic_limits[1][0]) / (self.haptic_limits[1][1] - self.haptic_limits[1][0])) * height
+        return int(np.clip(pos_x, 0, width)), int(np.clip(pos_y, 0, height))
+
     def haptic_control(
         self
     ) -> None:
-        def cursor(screen, color, pos, radius):
-            pygame.draw.circle(screen, color, pos, radius)
-        
-        pos_x, pos_y = device_state.position[0], device_state.position[1]
+        """
+        Control the deformation of the frame using a haptic device
+        """
 
-        cursor(self.screen, (255, 255, 255), (int(pos_x), int(pos_y)), 10)
-            
-        print(device_state.position)
-        if device_state.button:
-            print("Button pressed")
-            self.running = False
+        position = torch.tensor(device_state.position[:2])
+        self.cur_pos = self._scale_haptic_2_screen(position)
+        
+        if device_state.button and not self.pre_button:
+            self.on_click = True
+            self.init_position = position
+            self.displacement = torch.tensor([0, 0])
+            self.alpha = 0
+            self.pixel = self._scale_haptic_2_screen(position)
+        
+        elif device_state.button and self.pre_button:
+            movement = position - self.init_position
+            self.displacement = movement / (movement.float().norm(2) + 1e-8)
+            self.displacement[1] = -self.displacement[1]
+            self.alpha = min(3.0, movement.float().norm(2) / 60)
+            # Set a force depending on the increase in the displacement
+            force_scale = self.alpha * 0.35
+            force = force_scale * np.array([-self.displacement[0], self.displacement[1], 0.0])
+            # self.cur_pos = self._scale_haptic_2_screen(position)
+            device_state.force = list(force)
+        
+        elif not device_state.button and self.pre_button:
+            self.on_click = False
+            self.pixel = None
+            self.displacement = torch.tensor([0, 0])
+            self.alpha = 0
+            device_state.force = [0.0, 0.0, 0.0]
+
+        self.pre_button = device_state.button
 
     def mouse_control(
         self
@@ -143,7 +215,7 @@ class InteractiveDemo(object):
                 self.on_click = False
             if event.type == pygame.MOUSEMOTION and self.on_click:
                 self.displacement = torch.tensor([event.pos[0] - self.pixel[0], event.pos[1] - self.pixel[1]])
-                self.alpha = min(15.0, self.displacement.float().norm(2) / 10)
+                self.alpha = min(30.0, self.displacement.float().norm(2) / 2)
                 self.displacement = self.displacement.float() / self.displacement.float().norm(2)
                 self.cur_pos = event.pos
             if event.type == pygame.QUIT:
@@ -181,15 +253,27 @@ class InteractiveDemo(object):
                                             (end[0] + trirad * math.sin(rotation + 120*rad),
                                                 end[1] + trirad * math.cos(rotation + 120*rad))))
         
+        def cursor(screen, color, pos, radius = 10):
+            pygame.draw.circle(screen, color, pos, radius)
+
         if self.cur_pos is not None and self.pixel is not None and self.on_click:
-            deformation_map, _ = calculate_deformation_map(self.motion_spectrum[0], -self.displacement, self.pixel, self.alpha)
+            if isinstance(self.motion_spectrum, tuple):
+                deformation_map, _ = calculate_deformation_map(self.motion_spectrum[0], -self.displacement, self.pixel, self.alpha)
+            else:
+                deformation_map, _ = calculate_deformation_map(self.motion_spectrum, -self.displacement, self.pixel, self.alpha)
+            
             deformed_frame = warp_flow(torch.from_numpy(self.reference_frame).permute(2, 0, 1).float().cuda(), deformation_map.cuda(), self.depth_map, self.mask)
             deformed_frame = self._crop_image_for_display(deformed_frame, (self.reference_frame.shape[0] - 30, self.reference_frame.shape[1] - 30))
             deformed_frame_surf = pygame.transform.rotate(pygame.transform.flip(pygame.surfarray.make_surface(deformed_frame), False, True), -90)
             self.screen.blit(deformed_frame_surf, (0, 0))
+            
+            cursor(self.screen, (255, 255, 255), self.cur_pos, 10)
             arrow(self.screen, (255, 255, 255), (255, 255, 255), self.pixel, self.cur_pos, 10)
+            
         else:
             self.screen.blit(self.image, (0, 0))
+            if self.control_type == ControlType.HAPTIC:
+                cursor(self.screen, (255, 255, 255), self.cur_pos, 10)
     
     def _init_masking(
         self
@@ -278,6 +362,7 @@ class InteractiveDemo(object):
         """
         while self.running:
             self.sim_step()
+        
         pygame.quit()
         
         if self.control_type == ControlType.HAPTIC:
@@ -285,6 +370,23 @@ class InteractiveDemo(object):
 
 
 if __name__ == "__main__":
-    pygame_demo = InteractiveDemo("videos/liver_stereo.avi", control_type=ControlType.MOUSE, filtering=True, masking=True)
-    pygame_demo.run()
+    
+    K = 16
+    
+    pygame_demo = InteractiveDemo(
+        "videos/liver_stereo.avi", 
+        control_type=ControlType.HAPTIC, 
+        filtering=True, 
+        masking=True, 
+        K = K
+    )
+    
+    try:
+        pygame_demo.run()
+    
+    # Close the haptic device if an exception occurs, so the device is not left open and generates a double segmentation fault
+    except Exception as e:
+        if pygame_demo.control_type == ControlType.HAPTIC and pygame_demo.backoff_count > 10:
+            print("Closing haptic device...")
+            pygame_demo.device.close()
 
