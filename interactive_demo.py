@@ -59,8 +59,15 @@ class InteractiveDemo(object):
         K: int = 16,
         depth_model_type: ModelType | str = ModelType.DPT_Large,
         control_type: str = ControlType.MOUSE,
+        norm_scale: float = 10.0,
+        alpha_limit: float = 5.0,
+        force_scale: float = 0.35,
+        display_cropping: tuple[int, int] = (30, 30),
         filtering: bool = True,
-        masking: bool = True
+        masking: bool = True,
+        near: float = 0.05,
+        far: float = 0.95,
+        inverse: bool = False
     ) -> None:
 
         frames = self._init_video_reader(video_path, start, end)
@@ -71,21 +78,26 @@ class InteractiveDemo(object):
             self.reference_frame = self.video_reader.read_frame(0)
 
         self.depth_map = self._get_depth_map(self.reference_frame, depth_model_type)
-        
+        self.near, self.far = near, far
+        self.inverse = inverse
         # Normalize depth map for depth culling
         self.depth_map = (self.depth_map - self.depth_map.min()) / (self.depth_map.max() - self.depth_map.min())
-        display_frame = apply_depth_culling(self.depth_map[0], self.reference_frame)
+        display_frame = apply_depth_culling(self.depth_map[0], self.reference_frame, self.near, self.far, self.inverse)
         # display_frame = apply_depth_culling(self.depth_map[0], self.reference_frame[0])
         self._get_motion_spectrum_from_video(frames, K, filtering, masking)
         self._control_func = {ControlType.MOUSE: self.mouse_control, ControlType.HAPTIC: self.haptic_control}[control_type]
         self.control_type = control_type
-        self._init_pygame(display_frame)
-        
         if control_type == ControlType.HAPTIC:
             self._init_haptic_device()
             self.haptic_limits = torch.tensor([[-210.0, 216.0], [27.7, 330.0]])
-            self.force_limits = torch.tensor([[-1.0, 1.0], [-1.0, 1.0]])        
-            
+            self.force_limits = torch.tensor([[-1.0, 1.0], [-1.0, 1.0]]) 
+            self.force_scale = force_scale
+        
+        self.display_cropping = display_cropping
+        self._init_pygame(display_frame)
+        self.alpha_limit = alpha_limit
+        self.norm_scale = norm_scale
+        
 
     def _init_pygame(
         self,
@@ -95,8 +107,9 @@ class InteractiveDemo(object):
         Initialize the pygame window and display the reference frame.
         """
         pygame.init()
-        self.screen = pygame.display.set_mode((reference_frame.shape[1] - 30, reference_frame.shape[0] - 30))
-        display_frame = self._crop_image_for_display(reference_frame, (reference_frame.shape[0] - 30, reference_frame.shape[1] - 30))
+        pygame.mouse.set_visible(False)
+        self.screen = pygame.display.set_mode((reference_frame.shape[1] - self.display_cropping[1], reference_frame.shape[0] - self.display_cropping[0]))
+        display_frame = self._crop_image_for_display(reference_frame, (reference_frame.shape[0] - self.display_cropping[0], reference_frame.shape[1] - self.display_cropping[1]))
         self.image = pygame.transform.rotate(pygame.transform.flip(pygame.surfarray.make_surface(display_frame), False, True), -90)
         pygame.display.set_caption("Interactive Demo")
         
@@ -161,6 +174,7 @@ class InteractiveDemo(object):
         pos_y = height - ((position[1] - self.haptic_limits[1][0]) / (self.haptic_limits[1][1] - self.haptic_limits[1][0])) * height
         return int(np.clip(pos_x, 0, width)), int(np.clip(pos_y, 0, height))
 
+
     def haptic_control(
         self
     ) -> None:
@@ -182,10 +196,10 @@ class InteractiveDemo(object):
             movement = position - self.init_position
             self.displacement = movement / (movement.float().norm(2) + 1e-8)
             self.displacement[1] = -self.displacement[1]
-            self.alpha = min(3.0, movement.float().norm(2) / 60)
+            self.alpha = min(self.alpha_limit, movement.float().norm(2) / self.norm_scale)
             # Set a force depending on the increase in the displacement
-            force_scale = self.alpha * 0.35
-            force = force_scale * np.array([-self.displacement[0], self.displacement[1], 0.0])
+            cur_force_scale = self.alpha * self.force_scale
+            force = cur_force_scale * np.array([-self.displacement[0], self.displacement[1], 0.0])
             # self.cur_pos = self._scale_haptic_2_screen(position)
             device_state.force = list(force)
         
@@ -197,6 +211,22 @@ class InteractiveDemo(object):
             device_state.force = [0.0, 0.0, 0.0]
 
         self.pre_button = device_state.button
+        
+        for event in pygame.event.get():
+            self._check_exit(event)
+
+    def _check_exit(
+        self,
+        event: pygame.event.Event
+    ) -> None:
+        """
+        Check if the user wants to exit the program.
+        """
+        if event.type == pygame.QUIT:
+            self.running = False
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self.running = False
 
     def mouse_control(
         self
@@ -213,13 +243,16 @@ class InteractiveDemo(object):
                 self.alpha = 0
             if event.type == pygame.MOUSEBUTTONUP:
                 self.on_click = False
-            if event.type == pygame.MOUSEMOTION and self.on_click:
-                self.displacement = torch.tensor([event.pos[0] - self.pixel[0], event.pos[1] - self.pixel[1]])
-                self.alpha = min(30.0, self.displacement.float().norm(2) / 2)
-                self.displacement = self.displacement.float() / self.displacement.float().norm(2)
+
+            if event.type == pygame.MOUSEMOTION:
+                if self.on_click:
+                    self.displacement = torch.tensor([event.pos[0] - self.pixel[0], event.pos[1] - self.pixel[1]])
+                    self.alpha = min(self.alpha_limit, self.displacement.float().norm(2) / self.norm_scale)
+                    self.displacement = self.displacement.float() / self.displacement.float().norm(2)
+                
                 self.cur_pos = event.pos
-            if event.type == pygame.QUIT:
-                self.running = False
+            
+            self._check_exit(event)
 
     def sim_step(
         self,
@@ -234,6 +267,7 @@ class InteractiveDemo(object):
         self._control_func()
         # Update the rendering of the frame
         self._update_render()
+        
 
         pygame.display.flip()
     
@@ -262,8 +296,8 @@ class InteractiveDemo(object):
             else:
                 deformation_map, _ = calculate_deformation_map(self.motion_spectrum, -self.displacement, self.pixel, self.alpha)
             
-            deformed_frame = warp_flow(torch.from_numpy(self.reference_frame).permute(2, 0, 1).float().cuda(), deformation_map.cuda(), self.depth_map, self.mask)
-            deformed_frame = self._crop_image_for_display(deformed_frame, (self.reference_frame.shape[0] - 30, self.reference_frame.shape[1] - 30))
+            deformed_frame = warp_flow(torch.from_numpy(self.reference_frame).permute(2, 0, 1).float().cuda(), deformation_map.cuda(), self.depth_map, self.mask, self.near, self.far, self.inverse)
+            deformed_frame = self._crop_image_for_display(deformed_frame, (self.reference_frame.shape[0] - self.display_cropping[0], self.reference_frame.shape[1] - self.display_cropping[1]))
             deformed_frame_surf = pygame.transform.rotate(pygame.transform.flip(pygame.surfarray.make_surface(deformed_frame), False, True), -90)
             self.screen.blit(deformed_frame_surf, (0, 0))
             
@@ -272,8 +306,7 @@ class InteractiveDemo(object):
             
         else:
             self.screen.blit(self.image, (0, 0))
-            if self.control_type == ControlType.HAPTIC:
-                cursor(self.screen, (255, 255, 255), self.cur_pos, 10)
+            cursor(self.screen, (255, 255, 255), self.cur_pos, 10)
     
     def _init_masking(
         self
@@ -374,11 +407,14 @@ if __name__ == "__main__":
     K = 16
     
     pygame_demo = InteractiveDemo(
-        "videos/liver_stereo.avi", 
-        control_type=ControlType.HAPTIC, 
+        "videos/capture1.avi", 
+        control_type=ControlType.MOUSE,
+        
         filtering=True, 
         masking=True, 
-        K = K
+        K = K,
+        end=10*30,
+        inverse=True
     )
     
     try:
