@@ -31,7 +31,8 @@ def warp_flow(
     depth_map: np.ndarray,
     mask: np.ndarray | None = None, 
     near: float = 0.05, 
-    far: float = 0.95
+    far: float = 0.95,
+    inverse: bool = False
 ) -> np.ndarray:
     
     """
@@ -58,6 +59,11 @@ def warp_flow(
     _, _, H, W = img.shape
     grid = make_grid(img)
     grid = grid + flow
+
+    # Apply the masking on the grid
+    if mask is not None:
+        grid = grid * mask
+
     # Perform depth culling based on near and far thresholds
     culled_depth_map = torch.where((depth_map >= near) &
                                    (depth_map <= far),
@@ -72,11 +78,11 @@ def warp_flow(
     grid = grid.permute(0, 2, 3, 1)
     img = img / 255.
     warped_img = torch.nn.functional.grid_sample(img, grid, mode="bicubic", padding_mode="zeros", align_corners=True)
-    warped_mask = torch.nn.functional.grid_sample(mask, grid, mode="nearest", padding_mode="zeros", align_corners=True) if mask is not None else None
-    if warped_mask is not None:
-        warped_img = warped_img * warped_mask
 
-    warped_img = culled_depth_map * warped_img
+    if inverse:
+        warped_img = warped_img * (1 - culled_depth_map)
+    else:
+        warped_img = culled_depth_map * warped_img
 
     warped_img = warped_img.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
     warped_img = np.clip(warped_img, 0., 1.)

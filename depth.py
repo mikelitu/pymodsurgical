@@ -37,11 +37,15 @@ def apply_depth_culling(
     depth_map: np.ndarray, 
     frame: np.ndarray,
     near: float = 0.05,
-    far: float = 0.95
+    far: float = 0.95,
+    invserse: bool = False
 ) -> torch.Tensor:
     
     culled_depth_map = np.where((depth_map >= near) & (depth_map <= far), depth_map, 0)
     culled_depth_map = (culled_depth_map - culled_depth_map.min()) / (culled_depth_map.max() - culled_depth_map.min())
     frame = (frame / 255).astype(np.float32)
-    culled_frame = frame * culled_depth_map[..., None]
+    if invserse:
+        culled_frame = frame * (1 - culled_depth_map[..., None])
+    else:
+        culled_frame = frame * culled_depth_map[..., None]
     return (255 * culled_frame).astype(np.uint8)

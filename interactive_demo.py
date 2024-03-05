@@ -401,28 +401,3 @@ class InteractiveDemo(object):
         if self.control_type == ControlType.HAPTIC:
             self.device.close()
 
-
-if __name__ == "__main__":
-    
-    K = 16
-    
-    pygame_demo = InteractiveDemo(
-        "videos/capture1.avi", 
-        control_type=ControlType.MOUSE,
-        
-        filtering=True, 
-        masking=True, 
-        K = K,
-        end=10*30,
-        inverse=True
-    )
-    
-    try:
-        pygame_demo.run()
-    
-    # Close the haptic device if an exception occurs, so the device is not left open and generates a double segmentation fault
-    except Exception as e:
-        if pygame_demo.control_type == ControlType.HAPTIC and pygame_demo.backoff_count > 10:
-            print("Closing haptic device...")
-            pygame_demo.device.close()
-
