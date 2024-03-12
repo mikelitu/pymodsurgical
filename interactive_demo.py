@@ -118,7 +118,7 @@ class InteractiveDemo(object):
         self.running = True
         self.on_click = False
         self.pixel = None
-        self.cur_pos = None
+        self.cur_pos = [0, 0]
         self.clock = pygame.time.Clock()
         self.displacement = torch.tensor([0, 0])
     
