@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import PosixPath
 
+
 def make_grid(img: torch.Tensor, device: torch.device = torch.device("cpu")) -> torch.Tensor:
     """
     Create a grid of the same size as the input image.
@@ -126,16 +127,23 @@ def motion_spectrum_2_grayimage(motion_spectrum: torch.Tensor) -> torch.Tensor:
         raise ValueError("The motion spectrum should have dtype torch.float")
     
     orig_shape = motion_spectrum.shape
-    if motion_spectrum.ndim != 4 and orig_shape[1] != 4:
-        raise ValueError("The motion spectrum should have shape (K, 4, H, W)")
+    if motion_spectrum.ndim != 4 or (orig_shape[1] != 4 and orig_shape[1] != 6):
+        raise ValueError("The motion spectrum should have shape (K, 4, H, W) or (K, 6, H, W)")
     
     motion_spectrum_X = torch.abs(motion_spectrum[:, 0] + 1j * motion_spectrum[:, 1])
     motion_spectrum_Y = torch.abs(motion_spectrum[:, 2] + 1j * motion_spectrum[:, 3])
-    motion_spectrum = torch.stack([motion_spectrum_X, motion_spectrum_Y], dim=1)
+    if orig_shape[1] == 6:
+        motion_spectrum_Z = torch.abs(motion_spectrum[:, 4] + 1j * motion_spectrum[:, 5])
+        motion_spectrum = torch.stack([motion_spectrum_X, motion_spectrum_Y, motion_spectrum_Z], dim=1)
+    else:
+        motion_spectrum = torch.stack([motion_spectrum_X, motion_spectrum_Y], dim=1)
     max_norm = torch.sum(motion_spectrum**2, dim=1).sqrt().max()
     epsilon = torch.finfo(motion_spectrum.dtype).eps
     motion_spectrum = motion_spectrum / (max_norm + epsilon)
     # img = _normalized_motion_spectrum_to_image(motion_spectrum)
+    if orig_shape[1] == 6:
+        return motion_spectrum[:, 0], motion_spectrum[:, 1], motion_spectrum[:, 2]
+    
     return motion_spectrum[:, 0], motion_spectrum[:, 1]
 
 
@@ -208,8 +216,8 @@ def motion_texture_from_flow_field(
     if len(flow_field.shape) == 4:
         flow_field = flow_field.view(-1, timestep, flow_field.shape[1], flow_field.shape[2], flow_field.shape[3])
 
-    batch_size, _, _, height, width = flow_field.shape
-    motion_texture = torch.zeros((batch_size, K, 4, height, width)).to(flow_field.device)
+    batch_size, _, dim, height, width = flow_field.shape
+    motion_texture = torch.zeros((batch_size, K, 4 if dim==2 else 6, height, width)).to(flow_field.device)
     for i in range(height):
         for j in range(width):
             x_t = flow_field[:, :, 0, i, j]
@@ -220,6 +228,11 @@ def motion_texture_from_flow_field(
             motion_texture[:, :, 1, i, j] = (1.0 / K) * X_f[:, 1:K+1].imag
             motion_texture[:, :, 2, i, j] = (1.0 / K) * Y_f[:, 1:K+1].real
             motion_texture[:, :, 3, i, j] = (1.0 / K) * Y_f[:, 1:K+1].imag
+            if dim == 3:
+                z_t = flow_field[:, :, 2, i, j]
+                Z_f = torch.fft.rfft(z_t, timestep, dim=-1)
+                motion_texture[:, :, 4, i, j] = (1.0 / K) * Z_f[:, 1:K+1].real
+                motion_texture[:, :, 5, i, j] = (1.0 / K) * Z_f[:, 1:K+1].imag
 
     return motion_texture
 
@@ -233,8 +246,8 @@ def flow_field_from_motion_texture(
     if len(motion_texture.shape) == 4:
         motion_texture = motion_texture.view(-1, K, motion_texture.shape[1], motion_texture.shape[2], motion_texture.shape[3])
 
-    batch_size, _, _, height, width = motion_texture.shape
-    flow_field = torch.zeros((batch_size, timesteps, 2, height, width)).to(motion_texture.device)
+    batch_size, _, dim, height, width = motion_texture.shape
+    flow_field = torch.zeros((batch_size, timesteps, 2 if dim==4 else 3, height, width)).to(motion_texture.device)
     for i in range(height):
         for j in range(width):
             X_f = motion_texture[:, :, 0, i, j].float() * K + 1j * motion_texture[:, :, 1, i, j].float() * K
@@ -243,5 +256,28 @@ def flow_field_from_motion_texture(
             y_t = torch.fft.irfft(Y_f, timesteps, dim=-1)
             flow_field[:, :, 0, i, j] = x_t
             flow_field[:, :, 1, i, j] = y_t
+            if dim==6:
+                Z_f = motion_texture[:, :, 4, i, j].float() * K + 1j * motion_texture[:, :, 5, i, j].float() * K
+                z_t = torch.fft.irfft(Z_f, timesteps, dim=-1)
+                flow_field[:, :, 2, i, j] = z_t
 
     return flow_field
+
+
+def get_motion_frequencies(
+    timesteps: int,
+    K: int,
+    sample_rate: float
+) -> torch.Tensor:
+    """
+    Compute the motion frequencies.
+
+    Args:
+        timesteps (int): Number of timesteps.
+        K (int): Number of frequencies.
+        sample_rate (float): The sample rate.
+
+    Returns:
+        frequencies (torch.Tensor): Tensor of shape (K,) and dtype torch.float.
+    """
+    return torch.fft.fftfreq(timesteps, 1 / sample_rate)[:K]

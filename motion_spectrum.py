@@ -6,13 +6,15 @@ from utils import create_save_dir
 from filtering import GaussianFiltering
 from masking import Masking
 from video_writer import VideoWriter
+import depth
 
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
 model = load_flow_model(device)
 
 def calculate_motion_spectrum(
     frames: list[np.ndarray], 
-    K: int, 
+    K: int,
+    depth_maps: list[np.ndarray] | None = None,
     batch_size: int = 500, 
     filtered: bool = True,
     mask: Masking | None = None,
@@ -37,13 +39,17 @@ def calculate_motion_spectrum(
     else:
         flows = estimate_flow(model, reference_frame, preprocess_frames[1:]).squeeze(0)
 
-    if filtered:
-        filtering = GaussianFiltering((3, 3), 0.5)
-        flows = filtering(preprocess_frames[1:], flows)
-
     if save_flow_video:
         video_writer = VideoWriter("flows.mp4", {"fps": 30}, "mono")
         video_writer(flows)
+
+    if depth_maps is not None:
+        depth_flow = depth.z_optical_flow_from_video(depth_maps)
+        flows = depth.create_rgbd(flows, depth_flow)
+    
+    if filtered:
+        filtering = GaussianFiltering((5, 5), 0.3)
+        flows = filtering(preprocess_frames[1:], flows)
 
     motion_spectrum = motion_texture_from_flow_field(flows, K, flows.shape[0]).squeeze(0)
     
@@ -55,6 +61,7 @@ def calculate_motion_spectrum(
 
 def save_motion_spectrum(
     motion_spectrum: torch.Tensor | tuple[torch.Tensor, torch.Tensor],
+    frequencies: torch.Tensor | tuple[torch.Tensor, torch.Tensor],
     save_dir: PosixPath | str,
     filtered: bool = False,
     masked: bool = False
@@ -71,8 +78,13 @@ def save_motion_spectrum(
                 
             tmp_save_dir = create_save_dir(save_dir, filename)
             print(f"Saving motion spectrum to: {tmp_save_dir}")
-            img_motion_spectrum_X, img_motion_spectrum_Y = motion_spectrum_2_grayimage(motion_spectrum[i])
-            plot_and_save([img_motion_spectrum_X, img_motion_spectrum_Y], tmp_save_dir, cmap="plasma")
+            dim = motion_spectrum[i].shape[1]
+            if dim == 4:
+                img_motion_spectrum_X, img_motion_spectrum_Y = motion_spectrum_2_grayimage(motion_spectrum[i])
+                plot_and_save([img_motion_spectrum_X, img_motion_spectrum_Y], tmp_save_dir, cmap="plasma")
+            else:
+                img_motion_spectrum_X, img_motion_spectrum_Y, img_motion_spectrum_Z = motion_spectrum_2_grayimage(motion_spectrum[i])
+                plot_and_save([img_motion_spectrum_X, img_motion_spectrum_Y, img_motion_spectrum_Z], tmp_save_dir, cmap="plasma")
     else:
         filename = "motion_spectrum.png"
         if filtered:
@@ -81,9 +93,15 @@ def save_motion_spectrum(
             filename = "masked_" + filename
         save_dir = create_save_dir(save_dir, filename)
         print("Saving motion spectrum to: ", save_dir)
-        img_motion_spectrum_X, img_motion_spectrum_Y = motion_spectrum_2_grayimage(motion_spectrum)
-        plot_and_save([img_motion_spectrum_X, img_motion_spectrum_Y], save_dir, cmap="plasma")
+        dim = motion_spectrum.shape[1]
+        if dim == 4:
+            img_motion_spectrum_X, img_motion_spectrum_Y = motion_spectrum_2_grayimage(motion_spectrum)
+            plot_and_save([img_motion_spectrum_X, img_motion_spectrum_Y], save_dir, cmap="plasma")
+        else:
+            img_motion_spectrum_X, img_motion_spectrum_Y, img_motion_spectrum_Z = motion_spectrum_2_grayimage(motion_spectrum)
+            plot_and_save([img_motion_spectrum_X, img_motion_spectrum_Y, img_motion_spectrum_Z], save_dir, cmap="plasma")
     
+
 def resize_spectrum_2_reference(
     motion_spectrum: torch.Tensor | tuple[torch.Tensor, torch.Tensor],
     reference_frame: np.ndarray
