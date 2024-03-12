@@ -39,6 +39,7 @@ class VideoWriter(object):
             out.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
         out.release()
 
+    
     def _write_stereo(self, frames: tuple[list[np.ndarray], list[np.ndarray]]) -> None:
         height, width, _ = frames[0][0].shape
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
