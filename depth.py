@@ -37,9 +37,10 @@ def load_depth_model_and_transform(model_type: ModelType) -> tuple[nn.Module, nn
 def calculate_depth_map(
     model: nn.Module, 
     transform: nn.Module, 
-    frame: np.ndarray | torch.Tensor
+    frame: np.ndarray | torch.Tensor,
+    device: str = "cuda"
 ) -> np.ndarray:
-    input_batch = transform(frame).to("cuda")
+    input_batch = transform(frame).to(device)
     with torch.no_grad():
         prediction = model(input_batch)
         prediction = F.interpolate(prediction.unsqueeze(1), size=(frame.shape[0], frame.shape[1]), mode="bicubic", align_corners=False).squeeze(1)
