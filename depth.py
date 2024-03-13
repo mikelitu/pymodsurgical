@@ -52,12 +52,11 @@ def calculate_depth_map_from_video(
     model: nn.Module,
     transform: nn.Module,
     video: list[np.ndarray],
-    batch_size: int = 50,
-    device: str = "cuda"
+    device: str = "cuda",
+    batch_size: int = 10,
 ) -> np.ndarray:
     
     batch_size = min(batch_size, len(video))
-    model.to(device)
     depth_map = []
     for i in range(0, len(video), batch_size):
         batch = np.array(video[i:i + batch_size])
