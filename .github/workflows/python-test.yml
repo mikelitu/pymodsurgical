@@ -31,7 +31,7 @@ jobs:
     
     - name: Download videos
       run: |
-        gdown https://drive.google.com/uc?export=download&id=15tKIC0ZC1IZddwhf1VjGTjnKPbact_DI -O temp.zip
+        gdown 'https://drive.google.com/uc?export=download&id=15tKIC0ZC1IZddwhf1VjGTjnKPbact_DI' -O temp.zip
         unzip temp.zip -d data
         rm temp.zip
       
