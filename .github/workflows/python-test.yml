@@ -12,7 +12,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: [3.9, 3.10, 3.11, 3.12]
+        python-version: [3.9, "3.10", 3.11, 3.12]
 
     steps:
     - uses: actions/checkout@v2
@@ -21,6 +21,10 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
+    - name: Hide GPUs from Pytorch
+      run: |
+        echo "export CUDA_VISIBLE_DEVICES=-1" >> $GITHUB_ENV
+        
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
