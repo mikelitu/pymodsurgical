@@ -10,7 +10,7 @@ class TestVideoReader(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         stereo_video_path = "videos/liver_stereo.avi"
-        mono_video_path = "videos/capture1.avi"
+        mono_video_path = "videos/rgb.mp4"
         with open("videos/metadata.json", "r") as f:
             video_config = json.load(f)
 
@@ -51,7 +51,7 @@ class TestVideoReader(unittest.TestCase):
         self.assertFalse(isinstance(type(frames_np[0]), type(frames_torch[0])))
         self.assertTrue(frames_np[0].shape[1] == frames_torch[0].shape[2] and frames_np[0].shape[2] == frames_torch[0].shape[3])
 
-    
+
     def test_read_mono(self):
         frames_np = self.mono_video_reader_np.read(0, 10)
         frames_torch = self.mono_video_reader_torch.read(0, 10)
