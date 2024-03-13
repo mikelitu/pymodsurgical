@@ -4,6 +4,7 @@ import torch.nn as nn
 import numpy as np
 from enum import StrEnum
 from utils import _norm_numpy, _norm_torch
+from sklearn.cluster import KMeans
 
 model_hub = "intel-isl/MiDaS"
 
@@ -54,6 +55,7 @@ def calculate_depth_map_from_video(
     device: str = "cuda"
 ) -> np.ndarray:
     
+    batch_size = min(batch_size, len(video))
     model.to(device)
     depth_map = []
     for i in range(0, len(video), batch_size):
@@ -122,7 +124,8 @@ def z_optical_flow_from_video(
 
 def unproject_image_to_point_cloud(
     depth_map: np.ndarray, 
-    K: np.ndarray
+    K: np.ndarray,
+    simplify: bool = False,
 ) -> np.ndarray:
     """Unproject a depth map to a point cloud"""
     inv_intrinsics = np.linalg.inv(K)
@@ -135,5 +138,23 @@ def unproject_image_to_point_cloud(
                 pixel = np.array([x, y, 1])
                 point = Z * np.dot(inv_intrinsics, pixel)
                 points.append(point)
+    
+    if simplify:
+        points = simplify_point_cloud(np.array(points), 1000)
 
     return np.array(points)
+
+
+def simplify_point_cloud(
+    point_cloud: np.ndarray,
+    num_samples: int
+) -> np.ndarray:
+    
+    num_points_original = point_cloud.shape[0]
+    if num_points_original <= num_samples:
+        return point_cloud
+    
+    # Use KMeans clustering to find the representative points
+    kmeans = KMeans(n_clusters=num_samples)
+    kmeans.fit(point_cloud)
+    return kmeans.cluster_centers_
