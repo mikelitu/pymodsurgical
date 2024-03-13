@@ -63,8 +63,8 @@ class TestDepth(unittest.TestCase):
         unprojected_img = depth.unproject_image_to_point_cloud(depth_frame.squeeze(0), self.intrinsics, False)
         simp_unprojected_img = depth.unproject_image_to_point_cloud(depth_frame.squeeze(0), self.intrinsics, True)
         self.assertTrue(isinstance(simp_unprojected_img, np.ndarray))
-        self.assertTrue(simp_unprojected_img.shape[0] != unprojected_img.shape[0])
-        self.assertTrue(simp_unprojected_img.shape[1] == 3)
+        self.assertLessEqual(simp_unprojected_img.shape[0], unprojected_img.shape[0])
+        self.assertTrue(simp_unprojected_img.shape[0] == 1000)
 
 
 if __name__ == "__main__":

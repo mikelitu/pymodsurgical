@@ -40,6 +40,7 @@ class TestVideoReader(unittest.TestCase):
         self.assertFalse(isinstance(type(frame_np), type(frame_torch)))
         self.assertTrue(frame_np.shape[0] == frame_torch.shape[1] and frame_np.shape[1] == frame_torch.shape[2])
     
+
     def test_read_stereo(self):
         frames_np = self.stereo_video_reader_np.read(0, 10)
         frames_torch = self.stereo_video_reader_torch.read(0, 10)
@@ -50,6 +51,7 @@ class TestVideoReader(unittest.TestCase):
         self.assertFalse(isinstance(type(frames_np[0]), type(frames_torch[0])))
         self.assertTrue(frames_np[0].shape[1] == frames_torch[0].shape[2] and frames_np[0].shape[2] == frames_torch[0].shape[3])
 
+    
     def test_read_mono(self):
         frames_np = self.mono_video_reader_np.read(0, 10)
         frames_torch = self.mono_video_reader_torch.read(0, 10)
