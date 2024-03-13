@@ -24,7 +24,17 @@ jobs:
     - name: Hide GPUs from Pytorch
       run: |
         echo "export CUDA_VISIBLE_DEVICES=-1" >> $GITHUB_ENV
-        
+    
+    - name: Install gdown
+      run: |
+        pip install gdown
+    
+    - name: Download videos
+      run: |
+        gdown 'https://drive.google.com/drive/folders/1pzRLZkO3E5yBcv_PCb2VAjd0l6gRQnaG?usp=drive_link' -0 temp.zip
+        unzip temp.zip -d data
+        rm temp.zip
+      
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
