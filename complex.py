@@ -3,11 +3,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import PosixPath, Path
 
+
 def tensor_rotate_phase_to_real_axis(tensor: torch.Tensor) -> torch.Tensor:
     """
     Rotate the phase of a complex tensor to the real axis.
     """
     return torch.abs(tensor)
+
 
 def complex_from_magnitude_phase(magnitude: torch.Tensor, phase: torch.Tensor) -> torch.Tensor:
     """
@@ -17,6 +19,7 @@ def complex_from_magnitude_phase(magnitude: torch.Tensor, phase: torch.Tensor) -
     imag_part = magnitude * torch.sin(phase)
     return real_part + 1j * imag_part
 
+
 def complex_to_magnitude_phase(complex_tensor: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Convert a complex tensor to polar coordinates.
@@ -25,12 +28,21 @@ def complex_to_magnitude_phase(complex_tensor: torch.Tensor) -> tuple[torch.Tens
     phase = torch.angle(complex_tensor)
     return magnitude, phase
 
+
 def motion_spectrum_2_complex(
     motion_spectrum: torch.Tensor | tuple[torch.Tensor, torch.Tensor]
 ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
     """
     Convert a motion spectrum to a complex tensor.
+    Args:
+        motion_spectrum (torch.Tensor | tuple[torch.Tensor, torch.Tensor]): The motion spectrum.
+        motion spectrum should be a tensor with shape (K, 2*dim, height, width) or a tuple of two tensors with shape (K, dim, height, width).
+    Returns:
+        torch.Tensor | tuple[torch.Tensor, torch.Tensor]: The complex motion spectrum.
+        The shape of the new tensor is (K, dim, height, width) with real and complex components.
     """
+
+    
     if isinstance(motion_spectrum, tuple):
         left_motion_spectrum = motion_spectrum[0]
         right_motion_spectrum = motion_spectrum[1]
@@ -38,7 +50,11 @@ def motion_spectrum_2_complex(
         right_complex_motion_spectrum = motion_spectrum_2_complex(right_motion_spectrum)
         return left_complex_motion_spectrum, right_complex_motion_spectrum
     
+    
     K, dim, height, width = motion_spectrum.shape
+    if dim not in [4, 6]:
+        raise ValueError("The dimension of the motion spectrum must be 4 for 2D tensors or 6 for 3D tensors.")
+    
     complex_motion_spectrum = torch.zeros(K, 2 if dim==4 else 3, height, width).to(motion_spectrum.device, dtype=torch.cfloat)
 
     complex_motion_spectrum[:, 0, :, :] = motion_spectrum[:, 0, :, :] + 1j * motion_spectrum[:, 1, :, :]
@@ -48,6 +64,7 @@ def motion_spectrum_2_complex(
     
     return complex_motion_spectrum
 
+
 def normalize_modal_coordinate(
     modal_coordinate: torch.Tensor
 ) -> torch.Tensor:
@@ -56,6 +73,7 @@ def normalize_modal_coordinate(
     """
     norm = torch.linalg.norm(modal_coordinate, dim=1, ord=2)
     return modal_coordinate / norm.unsqueeze(-1)
+
 
 def plot_modal_coordinates(
     modal_coordinates: torch.Tensor | np.ndarray,
@@ -98,11 +116,11 @@ def plot_modal_coordinates(
 
     # Set the title of the plot
     if modal_coordinates.shape[1] == 2:
-        str_displacement = f"({displacement[0]}, {displacement[1]})"
+        str_displacement = f"({displacement[0]}_{displacement[1]})"
     else:
-        str_displacement = f"({displacement[0]}, {displacement[1]}, {displacement[2]})"
+        str_displacement = f"({displacement[0]}_{displacement[1]}_{displacement[2]})"
 
-    str_pixel = f"({pixel[0]}, {pixel[1]})"
+    str_pixel = f"({pixel[0]}_{pixel[1]})"
     title = f"Modal Coordinates for Displacement {str_displacement} and Pixel {str_pixel}"
     fig.suptitle(title, fontsize=16)
     fig.supylabel('Imaginary Part')
@@ -120,8 +138,6 @@ def plot_modal_coordinates(
     if show:
         plt.show()
     
-    
-
 
 def save_modal_coordinates(
     modal_coordinates: torch.Tensor,

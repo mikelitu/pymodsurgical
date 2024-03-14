@@ -43,10 +43,16 @@ class VideoReader(object):
             self._left_distortion_coefficients = np.array(video_config[video_path.stem]["left_calibration_matrix"][9:])
             self._right_calibration_matrix = np.array(video_config[video_path.stem]["right_calibration_matrix"][:9]).reshape(3, 3)
             self._right_distortion_coefficients = np.array(video_config[video_path.stem]["right_calibration_matrix"][9:])
+        
         except Exception:
             print("Calibration cofficients not found in metadata...")
 
-    def _read_mono(self, start: int = 0, end: int = 0) -> list[np.ndarray]:
+    def _read_mono(
+        self, 
+        start: int = 0, 
+        end: int = 0
+    ) -> list[np.ndarray]:
+        
         if end == 0:
             end = self.video_length
         elif end > self.video_length:
@@ -62,7 +68,13 @@ class VideoReader(object):
                 break
         return frames
     
-    def _read_stereo(self, start: int = 0, end: int = 0) -> tuple[list[np.ndarray], list[np.ndarray]]:
+
+    def _read_stereo(
+        self, 
+        start: int = 0, 
+        end: int = 0
+    ) -> tuple[list[np.ndarray], list[np.ndarray]]:
+        
         if end == 0:
             end = self.video_length
         elif end > self.video_length:
@@ -82,13 +94,21 @@ class VideoReader(object):
                 break
         return left_frames, right_frames
 
-    def read(self, start: int = 0, end: int = 0) -> list[np.ndarray] | tuple[list[np.ndarray], list[np.ndarray]]:
+    def read(
+        self, 
+        start: int = 0, 
+        end: int = 0
+    ) -> (np.ndarray | torch.Tensor) | tuple[np.ndarray | torch.Tensor, np.ndarray | torch.Tensor]:
         return self._return_func(self._reading_method(start, end))
     
     def read_frame(self, frame_number: int) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         return self._return_func(self._frame_reading_method(frame_number))
     
-    def _read_mono_frame(self, frame_number: int) -> np.ndarray:
+    def _read_mono_frame(
+        self, 
+        frame_number: int
+    ) -> np.ndarray:
+        
         if frame_number > self.video_length:
             raise ValueError(f"Frame number out of range, for video of length {self.video_length}")
         
@@ -99,7 +119,11 @@ class VideoReader(object):
         else:
             raise ValueError(f"Frame number out of range, for video of length {self.video_length}")
     
-    def _read_stereo_frame(self, frame_number: int) -> tuple[np.ndarray, np.ndarray]:
+    def _read_stereo_frame(
+        self, 
+        frame_number: int
+    ) -> tuple[np.ndarray, np.ndarray]:
+        
         if frame_number > self.video_length:
             raise ValueError(f"End frame number out of range, for video of length {self.video_length}")
     
@@ -112,8 +136,6 @@ class VideoReader(object):
             return cv2.cvtColor(left_frame, cv2.COLOR_BGR2RGB), cv2.cvtColor(right_frame, cv2.COLOR_BGR2RGB)
         else:
             raise ValueError(f"Frame number out of range, for video of length {self.video_length}")
-    
-   
     
     def _return_numpy(
         self, 
@@ -131,12 +153,23 @@ class VideoReader(object):
     ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         
         if isinstance(frames, tuple):
+            if isinstance(frames[0], np.ndarray):
+                frames = (frames[0][np.newaxis, ...], frames[1][np.newaxis, ...])
+                single_frame = True
+            else:
+                single_frame = False
+
             left_frames = [torch.tensor(frame).permute(2, 0, 1) for frame in frames[0]]
             right_frames = [torch.tensor(frame).permute(2, 0, 1) for frame in frames[1]]
-            return torch.stack(left_frames), torch.stack(right_frames)
+            return torch.stack(left_frames).squeeze(0) if single_frame else torch.stack(left_frames), torch.stack(right_frames).squeeze(0) if single_frame else torch.stack(right_frames)
         else:
+            if isinstance(frames, np.ndarray):
+                frames = frames[np.newaxis, ...]
+                single_frame = True
+            else:
+                single_frame = False
             frames = [torch.tensor(frame).permute(2, 0, 1) for frame in frames]
-            return torch.stack(frames)
+            return torch.stack(frames).squeeze(0) if single_frame else torch.stack(frames)
         
     def _return_list(
         self, 
