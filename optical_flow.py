@@ -217,6 +217,9 @@ def motion_texture_from_flow_field(
         flow_field = flow_field.view(-1, timestep, flow_field.shape[1], flow_field.shape[2], flow_field.shape[3])
 
     batch_size, _, dim, height, width = flow_field.shape
+    if dim not in [2, 3]:
+        raise ValueError("The dimension of the flow field must be 2 for 2D tensors or 3 for 3D tensors.")
+    
     motion_texture = torch.zeros((batch_size, K, 4 if dim==2 else 6, height, width)).to(flow_field.device)
     for i in range(height):
         for j in range(width):
