@@ -12,9 +12,7 @@ def euler_solver(
     time_step: float = 0.1,
 ) -> torch.Tensor:
     modal_displacements = modal_coordinate - prev_modal_coordinate
-    print(modal_displacements)
     modal_velocities = modal_displacements / time_step
-    print(modal_velocities)
     new_q = []
 
     for md, mv, omega, m in zip(modal_displacements, modal_velocities, frequencies, modal_mass):
