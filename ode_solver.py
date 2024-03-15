@@ -18,24 +18,26 @@ def euler_solver(
     for md, mv, omega, m in zip(modal_displacements, modal_velocities, frequencies, modal_mass):
         y = torch.concatenate((md.unsqueeze(0), mv.unsqueeze(0)))
         print(y)
-        xi = (1/2) *((alpha / omega) + beta * omega)
-        mv = (mv + xi * md) / (1 + xi * time_step)
+        xi = (1/2) * ((alpha / omega) + beta * omega)
+        print(xi)
         A = torch.tensor([[1, time_step], [-omega**2 * time_step, 1 - 2 * xi * time_step]])
+        print(A)
         B = torch.tensor([[0], [time_step / m]])
-        tmp_y = A @ y + B
+        tmp_y = A @ y 
+        print(tmp_y)
         tmp_q = tmp_y[0, :] - 1j * (tmp_y[1, :] / omega)        
         new_q.append(tmp_q)
     
     return torch.stack(new_q)
 
 if __name__ == "__main__":
-    modal_coordinate = torch.tensor([[1, 2], [3, 4]]).to(dtype=torch.float)
+    modal_coordinate = torch.tensor([[1, 1], [1.1, 0.9]]).to(dtype=torch.float)
     prev_modal_coordinate = torch.tensor([[1, 1], [1, 1]]).to(dtype=torch.float)
     frequencies = torch.tensor([0.1, 0.2]).to(dtype=torch.float)
     modal_mass = torch.tensor([1, 2]).to(dtype=torch.float)
-    alpha = 0.01
-    beta = 0.01
-    time_step = 0.05
+    alpha = 0.05
+    beta = 0.05
+    time_step = 0.03
     new_modal_coordinate = euler_solver(modal_coordinate, prev_modal_coordinate, frequencies, modal_mass, alpha, beta, time_step)
     print(new_modal_coordinate)
     # tensor([[0.9000, 1.8000],
