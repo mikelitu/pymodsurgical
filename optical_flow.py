@@ -273,7 +273,7 @@ def flow_field_from_motion_texture(
 def get_motion_frequencies(
     timesteps: int,
     K: int,
-    sample_rate: float
+    sampling_period: float
 ) -> torch.Tensor:
     """
     Compute the motion frequencies.
@@ -286,4 +286,7 @@ def get_motion_frequencies(
     Returns:
         frequencies (torch.Tensor): Tensor of shape (K,) and dtype torch.float.
     """
-    return torch.fft.fftfreq(timesteps, 1 / sample_rate)[:K]
+
+    frequency_spacing = 1.0 / (timesteps * sampling_period)
+    frequencies = torch.fft.fftfreq(timesteps, d=sampling_period)[1:K+1]
+    return 2 * torch.pi * (frequencies * frequency_spacing)

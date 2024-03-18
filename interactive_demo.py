@@ -1,49 +1,61 @@
 import pygame
 from motion_spectrum import calculate_motion_spectrum, resize_spectrum_2_reference
 from video_reader import VideoReader, RetType
-from displacement import calculate_deformation_map
+from displacement import calculate_deformation_map_from_displacement, calculate_deformation_map_from_modal_coordinate, calculate_modal_coordinate
 import torch
 from complex import motion_spectrum_2_complex
 import json
 from pathlib import Path, PosixPath
 from masking import Masking
 import math
-from optical_flow import warp_flow
+from optical_flow import warp_flow, get_motion_frequencies
 import numpy as np
 import torch.nn as nn
 from enum import StrEnum
-from dataclasses import dataclass, field
-from pyOpenHaptics.hd_device import HapticDevice
-import pyOpenHaptics.hd as hd
-from pyOpenHaptics.hd_callback import hd_callback
+
+try:
+    from dataclasses import dataclass, field
+    from pyOpenHaptics.hd_device import HapticDevice
+    import pyOpenHaptics.hd as hd
+    from pyOpenHaptics.hd_callback import hd_callback
+except OSError:
+    pass
+
 import time
 from depth import calculate_depth_map, load_depth_model_and_transform, apply_depth_culling, ModelType
+from ode_solver import euler_solver
+
 
 rad = math.pi / 180
+device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-@dataclass
-class DeviceState:
-    button: bool = False
-    pre_button: bool = False
-    position: list = field(default_factory=list)
-    force: list = field(default_factory=list)
+try:
+    @dataclass
+    class DeviceState:
+        button: bool = False
+        pre_button: bool = False
+        position: list = field(default_factory=list)
+        force: list = field(default_factory=list)
 
-device_state = DeviceState()
+    device_state = DeviceState()
 
-@hd_callback
-def device_callback():
-    global device_state
-    """
-    Callback function for the haptic device.
-    """
-    # Get the current position of the device
-    transform = hd.get_transform()
-    device_state.position = [transform[3][0], transform[3][1], transform[3][2]]
-    # Set the force to the device
-    hd.set_force(device_state.force)
-    # Get the current state of the device buttons
-    button = hd.get_buttons()
-    device_state.button = True if button == 1 else False
+    @hd_callback
+    def device_callback():
+        global device_state
+        """
+        Callback function for the haptic device.
+        """
+        # Get the current position of the device
+        transform = hd.get_transform()
+        device_state.position = [transform[3][0], transform[3][1], transform[3][2]]
+        # Set the force to the device
+        hd.set_force(device_state.force)
+        # Get the current state of the device buttons
+        button = hd.get_buttons()
+        device_state.button = True if button == 1 else False
+
+except NameError:
+    pass
 
 class ControlType(StrEnum):
     MOUSE = "mouse"
@@ -54,6 +66,7 @@ class InteractiveDemo(object):
     def __init__(
         self,
         video_path: PosixPath | str,
+        fps: int = 24,
         start: int = 0,
         end: int = 0,
         K: int = 16,
@@ -97,7 +110,10 @@ class InteractiveDemo(object):
         self._init_pygame(display_frame)
         self.alpha_limit = alpha_limit
         self.norm_scale = norm_scale
-        
+        timesteps = len(frames[0]) if isinstance(frames, tuple) else len(frames)
+        self.frequencies = get_motion_frequencies(timesteps, K, 1 / fps)
+        print(self.frequencies.shape)
+        self.fps = fps
 
     def _init_pygame(
         self,
@@ -119,9 +135,11 @@ class InteractiveDemo(object):
         self.on_click = False
         self.pixel = None
         self.cur_pos = [0, 0]
+        self.alpha = 0
         self.clock = pygame.time.Clock()
         self.displacement = torch.tensor([0, 0])
-    
+        self.modal_coordinates = None
+        
 
     def _init_haptic_device(
         self
@@ -260,17 +278,41 @@ class InteractiveDemo(object):
         """
         Simulate the deformation of the frame based on the user input.
         """
-        self.clock.tick(30)
+        self.clock.tick(self.fps)
         self.screen.fill((1, 1, 1))
         
         # Control the deformation of the frame
         self._control_func()
         # Update the rendering of the frame
         self._update_render()
-        
-
+        # Update the display
         pygame.display.flip()
-    
+
+    def _solve_ode(
+        self
+    ) -> None:
+        
+        if self.modal_coordinates is None:
+            if isinstance(self.motion_spectrum, tuple):
+                self.modal_coordinates = calculate_modal_coordinate(self.motion_spectrum[0], self.displacement, self.pixel, self.alpha)
+                
+            else:
+                self.modal_coordinates = calculate_modal_coordinate(self.motion_spectrum, self.displacement, self.pixel, self.alpha)
+
+            self.alpha = np.linalg.norm(self.modal_coordinates, axis=1).max()
+        
+        modal_mass = torch.ones(self.modal_coordinates.shape[0]).to(device)
+        force = torch.zeros(self.modal_coordinates.shape[0], 2).to(device, dtype=torch.cfloat)
+        self.modal_coordinates = euler_solver(self.modal_coordinates, self.frequencies, modal_mass, force, alpha=0.1, beta=0.1, time_step=0.033)
+        
+        if isinstance(self.motion_spectrum, tuple):
+            deformation_map = calculate_deformation_map_from_modal_coordinate(self.modal_coordinates, self.motion_spectrum[0])
+        else:
+            deformation_map = calculate_deformation_map_from_modal_coordinate(self.modal_coordinates, self.motion_spectrum)
+
+        return deformation_map
+
+
     def _update_render(
         self
     ) -> None:
@@ -290,13 +332,13 @@ class InteractiveDemo(object):
         def cursor(screen, color, pos, radius = 10):
             pygame.draw.circle(screen, color, pos, radius)
 
-        if self.cur_pos is not None and self.pixel is not None and self.on_click:
+        if self.pixel is not None and self.on_click:
             if isinstance(self.motion_spectrum, tuple):
-                deformation_map, _ = calculate_deformation_map(self.motion_spectrum[0], -self.displacement, self.pixel, self.alpha)
+                deformation_map, _ = calculate_deformation_map_from_displacement(self.motion_spectrum[0], -self.displacement, self.pixel, self.alpha)
             else:
-                deformation_map, _ = calculate_deformation_map(self.motion_spectrum, -self.displacement, self.pixel, self.alpha)
+                deformation_map, _ = calculate_deformation_map_from_displacement(self.motion_spectrum, -self.displacement, self.pixel, self.alpha)
             
-            deformed_frame = warp_flow(torch.from_numpy(self.reference_frame).permute(2, 0, 1).float().cuda(), deformation_map.cuda(), self.depth_map, self.mask, self.near, self.far, self.inverse)
+            deformed_frame = warp_flow(torch.from_numpy(self.reference_frame).permute(2, 0, 1).float().to(device), deformation_map.to(device), self.depth_map, self.mask, self.near, self.far, self.inverse)
             deformed_frame = self._crop_image_for_display(deformed_frame, (self.reference_frame.shape[0] - self.display_cropping[0], self.reference_frame.shape[1] - self.display_cropping[1]))
             deformed_frame_surf = pygame.transform.rotate(pygame.transform.flip(pygame.surfarray.make_surface(deformed_frame), False, True), -90)
             self.screen.blit(deformed_frame_surf, (0, 0))
@@ -305,6 +347,10 @@ class InteractiveDemo(object):
             arrow(self.screen, (255, 255, 255), (255, 255, 255), self.pixel, self.cur_pos, 10)
             
         else:
+            if self.pixel is not None:
+                self._solve_ode()
+                print(self.modal_coordinates)
+
             self.screen.blit(self.image, (0, 0))
             cursor(self.screen, (255, 255, 255), self.cur_pos, 10)
     
@@ -334,6 +380,7 @@ class InteractiveDemo(object):
         self.video_reader = VideoReader(video_path, video_config, return_type=RetType.NUMPY)
         return self.video_reader.read(start, end)
     
+
     def _get_depth_map(
         self,
         reference_frame: np.ndarray,
@@ -344,9 +391,10 @@ class InteractiveDemo(object):
         """
         model, transform = load_depth_model_and_transform(depth_model_type)
         model.eval()
-        model.to("cuda")
+        model.to(device)
         depth_map = calculate_depth_map(model, transform, reference_frame)
         return depth_map
+
 
     def _get_motion_spectrum_from_video(
         self,
@@ -365,13 +413,14 @@ class InteractiveDemo(object):
             mask = None
             self.mask = None
         if isinstance(frames, tuple):
-            motion_spectrum = (calculate_motion_spectrum(frames[0], K, filtered=filtering, mask=mask, camera_pos="left", save_flow_video=True), calculate_motion_spectrum(frames[1], K, filtered=filtering, mask=mask, camera_pos="right"))
+            motion_spectrum = (calculate_motion_spectrum(frames[0], K, filtered=filtering, mask=mask, camera_pos="left", save_flow_video=False), calculate_motion_spectrum(frames[1], K, filtered=filtering, mask=mask, camera_pos="right"))
             motion_spectrum = resize_spectrum_2_reference(motion_spectrum, self.reference_frame)
             self.motion_spectrum, _ = motion_spectrum_2_complex(motion_spectrum)
         else:
             motion_spectrum = calculate_motion_spectrum(frames, K, filtered=filtering, mask=mask)
             self.motion_spectrum = motion_spectrum_2_complex(resize_spectrum_2_reference(motion_spectrum, self.reference_frame)) 
-        
+    
+
     def _crop_image_for_display(
         self,
         image: np.ndarray,
@@ -386,7 +435,8 @@ class InteractiveDemo(object):
         diff_width = width - crop_size[1]
         diff_height = height - crop_size[0]
         return image[diff_height // 2:height - diff_height // 2, diff_width // 2:width - diff_width // 2]
-        
+
+
     def run(
         self
     ) -> None:
