@@ -63,6 +63,7 @@ class ControlType(StrEnum):
 
 
 class InteractiveDemo(object):
+    
     def __init__(
         self,
         video_path: PosixPath | str,
@@ -112,8 +113,9 @@ class InteractiveDemo(object):
         self.norm_scale = norm_scale
         timesteps = len(frames[0]) if isinstance(frames, tuple) else len(frames)
         self.frequencies = get_motion_frequencies(timesteps, K, 1 / fps)
-        print(self.frequencies.shape)
+        self.solve = False
         self.fps = fps
+        print(self.frequencies)
 
     def _init_pygame(
         self,
@@ -138,7 +140,6 @@ class InteractiveDemo(object):
         self.alpha = 0
         self.clock = pygame.time.Clock()
         self.displacement = torch.tensor([0, 0])
-        self.modal_coordinates = None
         
 
     def _init_haptic_device(
@@ -233,6 +234,7 @@ class InteractiveDemo(object):
         for event in pygame.event.get():
             self._check_exit(event)
 
+
     def _check_exit(
         self,
         event: pygame.event.Event
@@ -245,6 +247,7 @@ class InteractiveDemo(object):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 self.running = False
+
 
     def mouse_control(
         self
@@ -259,8 +262,18 @@ class InteractiveDemo(object):
                 self.cur_pos = event.pos
                 self.displacement = torch.tensor([0, 0])
                 self.alpha = 0
+                self.solve = False
+            
             if event.type == pygame.MOUSEBUTTONUP:
                 self.on_click = False
+                self.solve = True
+                self.calc_pixel = self.pixel
+                print("Displacement: ", self.displacement)
+
+                if isinstance(self.motion_spectrum, tuple):
+                    self.modal_coordinates = calculate_modal_coordinate(self.motion_spectrum[0], -self.displacement, self.calc_pixel, self.alpha)
+                else:
+                    self.modal_coordinates = calculate_modal_coordinate(self.motion_spectrum, -self.displacement, self.calc_pixel, self.alpha)
 
             if event.type == pygame.MOUSEMOTION:
                 if self.on_click:
@@ -271,6 +284,7 @@ class InteractiveDemo(object):
                 self.cur_pos = event.pos
             
             self._check_exit(event)
+
 
     def sim_step(
         self,
@@ -288,27 +302,19 @@ class InteractiveDemo(object):
         # Update the display
         pygame.display.flip()
 
+
     def _solve_ode(
         self
-    ) -> None:
-        
-        if self.modal_coordinates is None:
-            if isinstance(self.motion_spectrum, tuple):
-                self.modal_coordinates = calculate_modal_coordinate(self.motion_spectrum[0], self.displacement, self.pixel, self.alpha)
-                
-            else:
-                self.modal_coordinates = calculate_modal_coordinate(self.motion_spectrum, self.displacement, self.pixel, self.alpha)
-
-            self.alpha = np.linalg.norm(self.modal_coordinates, axis=1).max()
+    ) -> torch.Tensor:
         
         modal_mass = torch.ones(self.modal_coordinates.shape[0]).to(device)
-        force = torch.zeros(self.modal_coordinates.shape[0], 2).to(device, dtype=torch.cfloat)
-        self.modal_coordinates = euler_solver(self.modal_coordinates, self.frequencies, modal_mass, force, alpha=0.1, beta=0.1, time_step=0.033)
+        force = -torch.ones(self.modal_coordinates.shape[0], 2).to(device, dtype=torch.cfloat)
+        self.modal_coordinates = euler_solver(self.modal_coordinates, self.frequencies, modal_mass, force, alpha=0.05, beta=0.05, time_step=0.025)
         
         if isinstance(self.motion_spectrum, tuple):
-            deformation_map = calculate_deformation_map_from_modal_coordinate(self.modal_coordinates, self.motion_spectrum[0])
+            deformation_map = calculate_deformation_map_from_modal_coordinate(self.motion_spectrum[0], self.modal_coordinates)
         else:
-            deformation_map = calculate_deformation_map_from_modal_coordinate(self.modal_coordinates, self.motion_spectrum)
+            deformation_map = calculate_deformation_map_from_modal_coordinate(self.motion_spectrum, self.modal_coordinates)
 
         return deformation_map
 
@@ -343,17 +349,24 @@ class InteractiveDemo(object):
             deformed_frame_surf = pygame.transform.rotate(pygame.transform.flip(pygame.surfarray.make_surface(deformed_frame), False, True), -90)
             self.screen.blit(deformed_frame_surf, (0, 0))
             
-            cursor(self.screen, (255, 255, 255), self.cur_pos, 10)
             arrow(self.screen, (255, 255, 255), (255, 255, 255), self.pixel, self.cur_pos, 10)
-            
+        
+        elif self.solve:
+            deformation_map = self._solve_ode()
+            deformed_frame = warp_flow(torch.from_numpy(self.reference_frame).permute(2, 0, 1).float().to(device), deformation_map.to(device), self.depth_map, self.mask, self.near, self.far, self.inverse)
+            deformed_frame_surf = pygame.transform.rotate(pygame.transform.flip(pygame.surfarray.make_surface(deformed_frame), False, True), -90)
+            self.screen.blit(deformed_frame_surf, (0, 0))
+
         else:
             if self.pixel is not None:
-                self._solve_ode()
+                deformation_map = self._solve_ode()
                 print(self.modal_coordinates)
 
             self.screen.blit(self.image, (0, 0))
-            cursor(self.screen, (255, 255, 255), self.cur_pos, 10)
+        
+        cursor(self.screen, (255, 255, 255), self.cur_pos, 10)
     
+
     def _init_masking(
         self
     ) -> Masking:
@@ -362,6 +375,7 @@ class InteractiveDemo(object):
         """
         return Masking(self.video_reader.video_config[self.video_reader.video_path.stem]["mask"], self.video_reader.video_type)
     
+
     def _init_video_reader(
         self,
         video_path: PosixPath | str,
