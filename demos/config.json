@@ -1,6 +1,8 @@
 {
     "liver": {
         "video_path": "videos/liver_stereo.avi",
+        "fps": 20,
+        "solver_time_step": 0.1,
         "start": 0,
         "end": 0,
         "K": 16,
@@ -18,6 +20,8 @@
 
     "diaphragm": {
         "video_path": "videos/capture1.avi",
+        "fps": 24,
+        "solver_time_step": 0.1,
         "start": 0,
         "end": 300,
         "K": 16,
