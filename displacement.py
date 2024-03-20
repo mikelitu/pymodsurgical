@@ -65,6 +65,7 @@ def calculate_modal_phase(
     else:
         return -angles + torch.pi/2
 
+
 def calculate_deformation_map_from_modal_coordinate(
     mode_shape: torch.Tensor | tuple[torch.Tensor, torch.Tensor],
     modal_coordinate: torch.Tensor,
@@ -79,8 +80,10 @@ def calculate_deformation_map_from_modal_coordinate(
         right_deformation_map = calculate_deformation_map_from_modal_coordinate(right_mode_shape, modal_coordinate[1])
         return left_deformation_map, right_deformation_map
     
-    deformation_map = (mode_shape * modal_coordinate.unsqueeze(-1).unsqueeze(-1)).real.sum(dim=0)
+    modal_coordinate = modal_coordinate.unsqueeze(-1).unsqueeze(-1)
+    deformation_map = (mode_shape * modal_coordinate).real.sum(dim=0)
     return deformation_map 
+
 
 def calculate_deformation_map_from_displacement(
     mode_shape: torch.Tensor | tuple[torch.Tensor, torch.Tensor],

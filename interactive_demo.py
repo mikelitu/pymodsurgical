@@ -67,6 +67,7 @@ class InteractiveDemo(object):
     def __init__(
         self,
         video_path: PosixPath | str,
+        solver_time_step: float = 0.03,
         fps: int = 24,
         start: int = 0,
         end: int = 0,
@@ -81,7 +82,9 @@ class InteractiveDemo(object):
         masking: bool = True,
         near: float = 0.05,
         far: float = 0.95,
-        inverse: bool = False
+        inverse: bool = False,
+        rayleigh_mass: float = 0.1,
+        rayleigh_stiffness: float = 0.1
     ) -> None:
 
         frames = self._init_video_reader(video_path, start, end)
@@ -115,7 +118,11 @@ class InteractiveDemo(object):
         self.frequencies = get_motion_frequencies(timesteps, K, 1 / fps)
         self.solve = False
         self.fps = fps
-        print(self.frequencies)
+        self.solver_time_step = solver_time_step
+        self.alpha = rayleigh_mass
+        self.beta = rayleigh_stiffness
+        self.mass = torch.ones(self.motion_spectrum.shape[0]).to(device)
+        self.rest_force = torch.zeros(self.motion_spectrum.shape[0], 2).to(device, dtype=torch.cfloat)
 
     def _init_pygame(
         self,
@@ -268,19 +275,18 @@ class InteractiveDemo(object):
                 self.on_click = False
                 self.solve = True
                 self.calc_pixel = self.pixel
-                print("Displacement: ", self.displacement)
 
                 if isinstance(self.motion_spectrum, tuple):
                     self.modal_coordinates = calculate_modal_coordinate(self.motion_spectrum[0], -self.displacement, self.calc_pixel, self.alpha)
                 else:
                     self.modal_coordinates = calculate_modal_coordinate(self.motion_spectrum, -self.displacement, self.calc_pixel, self.alpha)
-
+            
             if event.type == pygame.MOUSEMOTION:
                 if self.on_click:
                     self.displacement = torch.tensor([event.pos[0] - self.pixel[0], event.pos[1] - self.pixel[1]])
                     self.alpha = min(self.alpha_limit, self.displacement.float().norm(2) / self.norm_scale)
                     self.displacement = self.displacement.float() / self.displacement.float().norm(2)
-                
+
                 self.cur_pos = event.pos
             
             self._check_exit(event)
@@ -306,10 +312,19 @@ class InteractiveDemo(object):
     def _solve_ode(
         self
     ) -> torch.Tensor:
-        
-        modal_mass = torch.ones(self.modal_coordinates.shape[0]).to(device)
-        force = -torch.ones(self.modal_coordinates.shape[0], 2).to(device, dtype=torch.cfloat)
-        self.modal_coordinates = euler_solver(self.modal_coordinates, self.frequencies, modal_mass, force, alpha=0.05, beta=0.05, time_step=0.025)
+        """
+        Solve the ODE for the modal coordinates.
+        """
+
+        self.modal_coordinates = euler_solver(
+            self.modal_coordinates, 
+            self.frequencies, 
+            self.mass, 
+            self.rest_force, 
+            alpha=self.alpha, 
+            beta=self.beta, 
+            time_step=self.solver_time_step
+        )
         
         if isinstance(self.motion_spectrum, tuple):
             deformation_map = calculate_deformation_map_from_modal_coordinate(self.motion_spectrum[0], self.modal_coordinates)
@@ -354,14 +369,11 @@ class InteractiveDemo(object):
         elif self.solve:
             deformation_map = self._solve_ode()
             deformed_frame = warp_flow(torch.from_numpy(self.reference_frame).permute(2, 0, 1).float().to(device), deformation_map.to(device), self.depth_map, self.mask, self.near, self.far, self.inverse)
+            deformed_frame = self._crop_image_for_display(deformed_frame, (self.reference_frame.shape[0] - self.display_cropping[0], self.reference_frame.shape[1] - self.display_cropping[1]))
             deformed_frame_surf = pygame.transform.rotate(pygame.transform.flip(pygame.surfarray.make_surface(deformed_frame), False, True), -90)
             self.screen.blit(deformed_frame_surf, (0, 0))
 
         else:
-            if self.pixel is not None:
-                deformation_map = self._solve_ode()
-                print(self.modal_coordinates)
-
             self.screen.blit(self.image, (0, 0))
         
         cursor(self.screen, (255, 255, 255), self.cur_pos, 10)
