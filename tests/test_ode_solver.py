@@ -16,8 +16,8 @@ class TestSolver(unittest.TestCase):
         time_step = 0.1
 
         result = ode_solver.euler_solver(modal_coordinate, frequencies, modal_mass, force, alpha, beta, time_step)
-        expected_result = torch.tensor([[1.4 - 2.06j, -2.1 + 2.54j]])
-        self.assertTrue(torch.allclose(result, expected_result))
+        expected_result = torch.tensor([[1.0000+1.8600j, 1.9000+2.9400j]])
+        self.assertTrue(torch.allclose(result, expected_result, atol=1e-4, rtol=1e-4))
 
         # Test case 2
         modal_coordinate = torch.tensor([[1-2j, 2-3j]])
@@ -29,7 +29,7 @@ class TestSolver(unittest.TestCase):
         time_step = 0.2
 
         result = ode_solver.euler_solver(modal_coordinate, frequencies, modal_mass, force, alpha, beta, time_step)
-        expected_result = torch.tensor([[1.0-1.24j, 2.2-1.96j]])
+        expected_result = torch.tensor([[1.0000-1.2400j, 2.2000-1.9600j]])
         self.assertTrue(torch.allclose(result, expected_result))
 
         # Test case 3
@@ -44,8 +44,8 @@ class TestSolver(unittest.TestCase):
         
         result = ode_solver.euler_solver(modal_coordinate, frequencies, modal_mass, force, alpha, beta, time_step)
         expected_result = torch.tensor([
-            [1.2 - 2.03j, -1.0 + 1.83j], 
-            [2.125 - 1.2687j, -4.3250 + 2.5750j]
+            [1.0500+0.9400j, 2.0000+1.9800j],
+            [1.7750+2.1625j, 2.6750+3.2375j]
         ])
 
         self.assertTrue(torch.allclose(result, expected_result, atol=1e-4, rtol=1e-4))

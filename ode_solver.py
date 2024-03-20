@@ -16,7 +16,7 @@ def euler_solver(
     new_q = []
 
     for md, mv, omega, m, f in zip(modal_displacements, modal_velocities, frequencies, modal_mass, force):
-        y = torch.cat([md.unsqueeze(0), mv.unsqueeze(0)]).T.to(dtype=torch.cfloat, device=f.device)
+        y = torch.cat([md.unsqueeze(0), mv.unsqueeze(0)]).to(dtype=torch.cfloat, device=f.device)
         xi = (1/2) * ((alpha / omega) + beta * omega)
         A = torch.tensor([[1, time_step], [-omega**2 * time_step, 1 - 2 * xi * omega * time_step]]).to(dtype=torch.cfloat, device=y.device)
         B = torch.tensor([[0], [time_step / m]]).squeeze(1).to(dtype=torch.cfloat).to(device=y.device)
