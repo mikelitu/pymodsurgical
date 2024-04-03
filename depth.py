@@ -5,6 +5,11 @@ import numpy as np
 from enum import StrEnum
 from utils import _norm_numpy, _norm_torch
 from sklearn.cluster import KMeans
+import matplotlib.pyplot as plt
+from pathlib import Path
+from utils import create_save_dir
+from mpl_toolkits.mplot3d import Axes3D
+
 
 model_hub = "intel-isl/MiDaS"
 
@@ -37,9 +42,16 @@ def load_depth_model_and_transform(model_type: ModelType) -> tuple[nn.Module, nn
 def calculate_depth_map(
     model: nn.Module, 
     transform: nn.Module, 
-    frame: np.ndarray | torch.Tensor,
+    frame: np.ndarray | torch.Tensor | tuple[np.ndarray, np.ndarray],
     device: str = "cuda"
 ) -> np.ndarray:
+    
+    if isinstance(frame, tuple):
+        left_frame, right_frame = frame
+        left_depth_map = calculate_depth_map(model, transform, left_frame, device)
+        right_depth_map = calculate_depth_map(model, transform, right_frame, device)
+        return left_depth_map, right_depth_map
+    
     input_batch = transform(frame).to(device)
     with torch.no_grad():
         prediction = model(input_batch)
@@ -51,12 +63,17 @@ def calculate_depth_map(
 def calculate_depth_map_from_video(
     model: nn.Module,
     transform: nn.Module,
-    video: list[np.ndarray],
+    video: list[np.ndarray] | tuple[np.ndarray, np.ndarray],
     device: str = "cuda",
     batch_size: int = 10,
 ) -> np.ndarray:
     
-    batch_size = min(batch_size, len(video))
+    if isinstance(video, tuple):
+        left_video, right_video = video
+        left_depth_map = calculate_depth_map_from_video(model, transform, left_video, device, batch_size)
+        right_depth_map = calculate_depth_map_from_video(model, transform, right_video, device, batch_size)
+        return left_depth_map, right_depth_map
+    
     depth_map = []
     for i in range(0, len(video), batch_size):
         batch = np.array(video[i:i + batch_size])
@@ -158,3 +175,27 @@ def simplify_point_cloud(
     kmeans = KMeans(n_clusters=num_samples)
     kmeans.fit(point_cloud)
     return kmeans.cluster_centers_
+
+
+def plot_point_cloud(
+    point_cloud: np.ndarray,
+    colors: np.ndarray | None = None,
+    ax: Axes3D | None = None,
+    show: bool = True,
+    save: bool = False,
+    save_dir: str | Path = "./figures",
+) -> None:
+    
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+    
+    ax.scatter(point_cloud[:, 0], point_cloud[:, 1], point_cloud[:, 2], c=colors if colors is not None else point_cloud[:, 2])
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    if save:
+        save_dir = create_save_dir(save_dir, "point_cloud.png")
+        plt.savefig(save_dir, dpi=300)
+    if show:
+        plt.show()

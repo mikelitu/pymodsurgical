@@ -287,6 +287,6 @@ def get_motion_frequencies(
         frequencies (torch.Tensor): Tensor of shape (K,) and dtype torch.float.
     """
 
-    frequency_spacing = 1.0 / (timesteps * sampling_period)
+    # frequency_spacing = 1.0 / (timesteps * sampling_period)
     frequencies = torch.fft.fftfreq(timesteps, d=sampling_period)[1:K+1]
-    return 2 * torch.pi * (frequencies * frequency_spacing)
+    return 2 * torch.pi * frequencies

@@ -110,6 +110,7 @@ class InteractiveDemo(object):
             self.force_limits = torch.tensor([[-1.0, 1.0], [-1.0, 1.0]]) 
             self.force_scale = force_scale
         
+        
         self.display_cropping = display_cropping
         self._init_pygame(display_frame)
         self.alpha_limit = alpha_limit
