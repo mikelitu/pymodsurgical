@@ -3,6 +3,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import PosixPath, Path
 
+def calculate_norm(matrix: torch.Tensor) -> torch.Tensor:
+    """
+    Calculate the norm of a complex tensor.
+    """
+    return torch.norm(matrix, p='fro')
 
 def tensor_rotate_phase_to_real_axis(tensor: torch.Tensor) -> torch.Tensor:
     """
@@ -10,6 +15,15 @@ def tensor_rotate_phase_to_real_axis(tensor: torch.Tensor) -> torch.Tensor:
     """
     return torch.abs(tensor)
 
+
+def calculate_relative_contribution(mode_i: torch.Tensor, mode_j: torch.Tensor) -> torch.Tensor:
+    """
+    Calculate the relative contribution of mode j to mode i.
+    """
+    norm_mode_i = calculate_norm(mode_i)
+    norm_mode_j = calculate_norm(mode_j)
+
+    return (norm_mode_i / norm_mode_j) * 100
 
 def complex_from_magnitude_phase(magnitude: torch.Tensor, phase: torch.Tensor) -> torch.Tensor:
     """
