@@ -53,21 +53,21 @@ class TestOpticalFlow(unittest.TestCase):
         # Test case 1: 2D flow field
         model = optical_flow.load_flow_model(device)
         reference_frames = torch.randn(2, 3, 4, 4)
-        target_sequences = torch.randn(2, 5, 3, 4, 4)
+        target_sequences = torch.randn(2, 3, 4, 4)
         flows = optical_flow.estimate_flow(model, reference_frames, target_sequences)
-        self.assertEqual(flows.shape, (2, 5, 2, 4, 4))
+        self.assertEqual(flows.shape, (2, 2, 4, 4))
 
         # Test case 2: 3D flow field
-        reference_frames = torch.randn(1, 3, 5, 5)
-        target_sequences = torch.randn(1, 6, 3, 5, 5)
+        reference_frames = torch.randn(6, 3, 5, 5)
+        target_sequences = torch.randn(6, 3, 5, 5)
         flows = optical_flow.estimate_flow(model, reference_frames, target_sequences)
-        self.assertEqual(flows.shape, (1, 6, 2, 5, 5))
+        self.assertEqual(flows.shape, (6, 2, 5, 5))
 
         # Test case 3: Upscaling
-        reference_frames = torch.randn(1, 3, 100, 100)
-        target_sequences = torch.randn(1, 4, 3, 100, 100)
+        reference_frames = torch.randn(4, 3, 100, 100)
+        target_sequences = torch.randn(4, 3, 100, 100)
         flows = optical_flow.estimate_flow(model, reference_frames, target_sequences)
-        self.assertEqual(flows.shape, (1, 4, 2, 100, 100))
+        self.assertEqual(flows.shape, (4, 2, 100, 100))
     
 
     def test_preprocess_for_raft(self):
