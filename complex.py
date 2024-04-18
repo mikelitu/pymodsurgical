@@ -43,6 +43,13 @@ def complex_to_magnitude_phase(complex_tensor: torch.Tensor) -> tuple[torch.Tens
     return magnitude, phase
 
 
+def get_conjugate(complex_tensor: torch.Tensor) -> torch.Tensor:
+    """
+    Get the conjugate of a complex tensor.
+    """
+    return complex_tensor.conj()
+
+
 def motion_spectrum_2_complex(
     motion_spectrum: torch.Tensor | tuple[torch.Tensor, torch.Tensor]
 ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:

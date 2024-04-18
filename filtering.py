@@ -24,7 +24,7 @@ class GaussianFiltering:
         
         local_std = cv2.GaussianBlur(img.astype(np.float32) ** 2, self.kernel_size, self.sigma) - cv2.GaussianBlur(img.astype(np.float32), self.kernel_size, self.sigma) ** 2
         local_std = np.sqrt(np.maximum(local_std, 0))
-        local_std = local_std / local_std.max()
+        local_std = local_std / (local_std.max() + np.finfo(np.float32).eps)
         return local_std
     
     def _blur_image(self, img: np.ndarray) -> np.ndarray:

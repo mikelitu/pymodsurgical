@@ -171,38 +171,41 @@ def estimate_flow(
     reference_frames: torch.Tensor,
     target_sequences: torch.Tensor,
 ) -> torch.Tensor:
-    
-    # Check that the target images have the same shape as the reference frame
+    """
+    Estimate the optical flow between two frames.
+
+    Args:
+        model (torch.nn.Module): The flow estimator model.
+        reference_frames (torch.Tensor): The reference frames.
+        target_sequences (torch.Tensor): The target sequences.
+
+    Returns:
+        torch.Tensor: The estimated optical flow.
+
+    """
     batch_size = reference_frames.shape[0]
     
-    if len(target_sequences.shape) == 4:
-        target_sequences = target_sequences.view(batch_size, -1, 3, target_sequences.shape[2], target_sequences.shape[3])
-    
-    flows = torch.zeros((batch_size, target_sequences.shape[1], 2, reference_frames.shape[2], reference_frames.shape[3])).to(reference_frames.device)
+    flows = torch.zeros((batch_size, 2, reference_frames.shape[2], reference_frames.shape[3])).to(reference_frames.device)
     
     with torch.no_grad():
-        for i in range(batch_size):
-            reference_frame = reference_frames[i].unsqueeze(0)
-            target_sequence = target_sequences[i]
-            # Upscale the image to the minimum required size for the flow estimator
-            if reference_frame.shape[2] < 128 or reference_frame.shape[3] < 128:
-                in_height, in_width = reference_frame.shape[2], reference_frame.shape[3]
-                reference_frame = torch.nn.functional.interpolate(reference_frame, size=(128, 128), mode="bilinear")
-                target_sequence = torch.nn.functional.interpolate(target_sequence, size=(128, 128), mode="bilinear")
-            else:
-                in_height, in_width = reference_frame.shape[2], reference_frame.shape[3]
+        reference_frame = reference_frames
+        target_sequence = target_sequences
+        # Upscale the image to the minimum required size for the flow estimator
+        if reference_frame.shape[2] < 128 or reference_frame.shape[3] < 128:
+            in_height, in_width = reference_frame.shape[2], reference_frame.shape[3]
+            reference_frame = torch.nn.functional.interpolate(reference_frame, size=(128, 128), mode="bilinear")
+            target_sequence = torch.nn.functional.interpolate(target_sequence, size=(128, 128), mode="bilinear")
+        else:
+            in_height, in_width = reference_frame.shape[2], reference_frame.shape[3]
 
-            # Extend the reference frame batch size to match the length of the target sequence
-            reference_frame = reference_frame.repeat(len(target_sequence), 1, 1, 1)
-
-            
-            list_of_flows = model(reference_frame, target_sequence)
-            
-            cur_flows = list_of_flows[-1]
-            if in_height < 128 or in_width < 128:
-                flows[i] = torch.nn.functional.interpolate(cur_flows, size=(in_height, in_width), mode="bilinear")
-            else:
-                flows[i] = cur_flows
+        
+        list_of_flows = model(reference_frame, target_sequence)
+        
+        cur_flows = list_of_flows[-1]
+        if in_height < 128 or in_width < 128:
+            flows = torch.nn.functional.interpolate(cur_flows, size=(in_height, in_width), mode="bilinear")
+        else:
+            flows = cur_flows
 
     return flows
 

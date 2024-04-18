@@ -28,29 +28,30 @@ def calculate_motion_spectrum(
     B = preprocess_frames.shape[0]
     flows = torch.zeros((B - 1, 2, preprocess_frames.shape[2], preprocess_frames.shape[3])).to(device)
 
-    reference_frame = preprocess_frames[0].unsqueeze(0)
+    reference_frames = preprocess_frames[:-1]
+    target_frames = preprocess_frames[1:]
 
     if B > batch_size:
         number_of_batches = B // batch_size
         for i in range(number_of_batches):
             start = i * batch_size
             end = (i + 1) * batch_size
-            flows[start:end] = estimate_flow(model, reference_frame, preprocess_frames[start:end]).squeeze(0)
+            flows[start:end] = estimate_flow(model, reference_frames, target_frames[start:end]).squeeze(0)
     else:
-        flows = estimate_flow(model, reference_frame, preprocess_frames[1:]).squeeze(0)
+        flows = estimate_flow(model, reference_frames, target_frames).squeeze(0)
+
+    if filtered:
+        filtering = GaussianFiltering((11, 11), 3.0)
+        flows = filtering(target_frames, flows)
 
     if save_flow_video:
-        video_writer = VideoWriter("flows.mp4", {"fps": 30}, "mono")
+        video_writer = VideoWriter("flows.mp4", {"video_type": "mono", "fps": 30})
         video_writer(flows)
 
     if depth_maps is not None:
         depth_flow = depth.z_optical_flow_from_video(depth_maps)
         flows = depth.create_rgbd(flows, depth_flow)
     
-    if filtered:
-        filtering = GaussianFiltering((5, 5), 0.3)
-        flows = filtering(preprocess_frames[1:], flows)
-
     motion_spectrum = motion_texture_from_flow_field(flows, K, flows.shape[0]).squeeze(0)
     
     if mask is not None:
@@ -61,7 +62,6 @@ def calculate_motion_spectrum(
 
 def save_motion_spectrum(
     motion_spectrum: torch.Tensor | tuple[torch.Tensor, torch.Tensor],
-    frequencies: torch.Tensor | tuple[torch.Tensor, torch.Tensor],
     save_dir: PosixPath | str,
     filtered: bool = False,
     masked: bool = False

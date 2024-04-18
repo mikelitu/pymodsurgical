@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from complex import complex_from_magnitude_phase
+from complex import complex_from_magnitude_phase, get_conjugate
 
 def calculate_modal_coordinate(
     mode_shape: torch.Tensor, 
@@ -106,20 +106,45 @@ def calculate_deformation_map_from_displacement(
     return deformation_maps, modal_coordinates
 
 
-def calculate_force_from_deformation(
+def calculate_motion_compensation_matrix(
+    frequencies: torch.Tensor,
+    timestep: float = 0.1,
+    alpha: float = 0.1,
+    beta: float = 0.1
+):
+    print(frequencies)
+    conjugate_frequencies = get_conjugate(frequencies)
+    denominator = torch.exp(timestep * frequencies) - torch.exp(timestep * conjugate_frequencies)
+    numerator = torch.abs(torch.sqrt((alpha * frequencies + beta) ** 2 - 4 * frequencies))
+    print(denominator)
+    diagonal = numerator / denominator
+    return torch.eye(frequencies.shape[0]) * diagonal
+
+def calculate_force_from_modal_coords(
     mode_shape: torch.Tensor,
-    deformation_map: torch.Tensor,
-    prev_modal_coordinates: torch.Tensor,
+    displacement_map: torch.Tensor,
     modal_coordinate: torch.Tensor,
     frequencies: torch.Tensor,
-    timestep: float = 1.0
+    pixel: tuple[int, int],
+    timestep: float = 0.1,
+    alpha: float = 0.1,
+    beta: float = 0.1
 ) -> torch.Tensor:
-    modal_diff = (modal_coordinate.imag - prev_modal_coordinates.imag).reshape(-1, 2) 
-    modal_acc = frequencies.unsqueeze(1) * modal_diff * (1 / timestep)
-    mass = torch.ones_like(mode_shape) * 0.01 * torch.randn_like(mode_shape)
-    # modal_acc = frequencies * (1 / timestep) * (modal_coordinate.imag - prev_modal_coordinates.imag)
-    # modal_acc = modal_acc.reshape(-1, 2)
-    # inv_mode_shape = mode_shape.pinverse()
-    motion_transfer = torch.einsum("jakl, akl -> jakl", mass, deformation_map)
-    force_map = torch.einsum("jakl, ja -> jakl", motion_transfer, modal_acc)
-    return force_map.mean(dim=0).abs()
+    
+    """
+    Calculate the force from the optical flow and the previous displacement vector.
+    """
+    displacement_vector = displacement_map[:, *pixel]
+    print(displacement_vector)
+    # modal_diff = (modal_coordinate.imag - prev_modal_coordinates.imag).reshape(-1, 2) 
+    # modal_acc = frequencies.unsqueeze(1) * modal_diff * (1 / timestep)
+    # S = calculate_motion_compensation_matrix(frequencies, timestep, alpha, beta)
+    # print(S.shape)
+    # print(S.diag())
+    # trans_mode_shape = mode_shape[:, :, *pixel].unsqueeze(-1).transpose(1, 2)
+    # inv_mode_shape = (mode_shape[:, :, *pixel].unsqueeze(-1) * S @ trans_mode_shape).pinverse()
+    # # motion_transfer = torch.einsum("jakl, akl -> jakl", inv_mode_shape, deformation_map)
+    # force = (1 / timestep) * (inv_mode_shape @ (displacement.unsqueeze(-1).to(dtype=torch.cfloat) - mode_shape * modal_coordinate.unsqueeze(-1).to(dtype=torch.cfloat))).squeeze(-1)
+    # print(force)
+    
+    # return force.sum(dim=0).real

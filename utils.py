@@ -9,7 +9,8 @@ def create_save_dir(
     if not isinstance(save_dir, PosixPath):
         save_dir = Path(save_dir)
     if not save_dir.exists():
-        save_dir.mkdir()
+        save_dir.mkdir(parents=True)
+    print(f"Saving to: {save_dir / filename}")
     return save_dir / filename
 
 def _norm_numpy(
