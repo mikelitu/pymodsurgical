@@ -49,6 +49,14 @@ def get_conjugate(complex_tensor: torch.Tensor) -> torch.Tensor:
     """
     return complex_tensor.conj()
 
+def simplify_complex_tensor(complex_tensor: torch.Tensor) -> torch.Tensor:
+    """
+    Simplify a complex tensor.
+    """
+    real_values = complex_tensor.real
+    imag_values = complex_tensor.imag
+    return torch.atan2(imag_values, real_values)
+
 
 def motion_spectrum_2_complex(
     motion_spectrum: torch.Tensor | tuple[torch.Tensor, torch.Tensor]
@@ -94,6 +102,17 @@ def normalize_modal_coordinate(
     """
     norm = torch.linalg.norm(modal_coordinate, dim=1, ord=2)
     return modal_coordinate / norm.unsqueeze(-1)
+
+def orthonormal_normalization(
+    complex_tensor: torch.Tensor
+) -> torch.Tensor:
+    """
+    Compute the orthonormal normalization of a complex tensor.
+    """
+    shape = complex_tensor.shape
+    shape_range = tuple(range(1, len(shape)))
+    norm = torch.linalg.vector_norm(complex_tensor, dim=shape_range, keepdim=True)
+    return complex_tensor / norm
 
 
 def plot_modal_coordinates(

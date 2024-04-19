@@ -1,6 +1,9 @@
 import torch
 import numpy as np
-from complex import complex_from_magnitude_phase, get_conjugate
+import complex
+
+def normalize_displacement_map(displacement_map: torch.Tensor) -> torch.Tensor:
+    return (displacement_map - displacement_map.min()) / (displacement_map.max() - displacement_map.min())
 
 def calculate_modal_coordinate(
     mode_shape: torch.Tensor, 
@@ -21,7 +24,7 @@ def calculate_modal_coordinate(
     # Calculate the phase of the vector
     phase = calculate_modal_phase(mode_shape, displacement, pixel, maximize)
     # Convert the magnitude and phase to a complex tensor
-    return complex_from_magnitude_phase(magnitude, phase)
+    return complex.complex_from_magnitude_phase(magnitude, phase)
 
 
 def calculate_modal_magnitude(
@@ -112,15 +115,18 @@ def calculate_motion_compensation_matrix(
     alpha: float = 0.1,
     beta: float = 0.1
 ):
-    print(frequencies)
-    conjugate_frequencies = get_conjugate(frequencies)
-    denominator = torch.exp(timestep * frequencies) - torch.exp(timestep * conjugate_frequencies)
-    numerator = torch.abs(torch.sqrt((alpha * frequencies + beta) ** 2 - 4 * frequencies))
-    print(denominator)
-    diagonal = numerator / denominator
-    return torch.eye(frequencies.shape[0]) * diagonal
+    # conjugate_frequencies = get_conjugate(frequencies)
+    numerator = torch.exp(timestep * frequencies)
+    alpha_beta = alpha * frequencies + beta
 
-def calculate_force_from_modal_coords(
+    # Secure the denominator to be non negative by taking the absolute value before the square root
+    denominator = torch.sqrt(torch.abs(alpha_beta ** 2 - 4 * frequencies))
+
+    # Calculate the diagonal of the motion matrix
+    diagonal = numerator / (denominator + torch.finfo(torch.float32).eps)
+    return diagonal
+
+def calculate_force_from_displacement_map(
     mode_shape: torch.Tensor,
     displacement_map: torch.Tensor,
     modal_coordinate: torch.Tensor,
@@ -134,17 +140,25 @@ def calculate_force_from_modal_coords(
     """
     Calculate the force from the optical flow and the previous displacement vector.
     """
-    displacement_vector = displacement_map[:, *pixel]
-    print(displacement_vector)
-    # modal_diff = (modal_coordinate.imag - prev_modal_coordinates.imag).reshape(-1, 2) 
-    # modal_acc = frequencies.unsqueeze(1) * modal_diff * (1 / timestep)
-    # S = calculate_motion_compensation_matrix(frequencies, timestep, alpha, beta)
-    # print(S.shape)
-    # print(S.diag())
-    # trans_mode_shape = mode_shape[:, :, *pixel].unsqueeze(-1).transpose(1, 2)
-    # inv_mode_shape = (mode_shape[:, :, *pixel].unsqueeze(-1) * S @ trans_mode_shape).pinverse()
-    # # motion_transfer = torch.einsum("jakl, akl -> jakl", inv_mode_shape, deformation_map)
-    # force = (1 / timestep) * (inv_mode_shape @ (displacement.unsqueeze(-1).to(dtype=torch.cfloat) - mode_shape * modal_coordinate.unsqueeze(-1).to(dtype=torch.cfloat))).squeeze(-1)
-    # print(force)
+    # Calculate the motion compensation matrix
+    S = calculate_motion_compensation_matrix(frequencies, timestep, alpha, beta)
+    modal_coordinate = modal_coordinate.reshape(-1, 2, 1)
+
+    displacement_vector = displacement_map[:, *pixel].unsqueeze(-1)
+    force_sign = torch.sign(displacement_vector).squeeze(-1)
+    pixel_mode_shape = mode_shape[:, :, *pixel].unsqueeze(-1)
+    trans_pixel_mode_shape = pixel_mode_shape.transpose(1, 2)
+    mode_shape_mult = pixel_mode_shape * S.unsqueeze(-1).unsqueeze(-1) @ trans_pixel_mode_shape
+    inv_mode_shape_mult = mode_shape_mult.pinverse()
+    inv_mode_shape_mult = complex.orthonormal_normalization(inv_mode_shape_mult)
     
-    # return force.sum(dim=0).real
+    state_difference = displacement_vector - pixel_mode_shape * modal_coordinate
+
+    # Apply the constraint problem to calculate the force from a manipulation of the displacement vector
+    force = (2 / (timestep ** 2)) * (inv_mode_shape_mult * state_difference)
+    
+    # Force is the sum of the absolute value of the force in the x and y direction
+    force = force.abs().sum(dim=0).sum(dim=1)
+    force = force_sign * force
+
+    return force / 1.e6
