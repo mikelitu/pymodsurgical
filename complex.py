@@ -3,6 +3,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import PosixPath, Path
 
+def calculate_norm(matrix: torch.Tensor) -> torch.Tensor:
+    """
+    Calculate the norm of a complex tensor.
+    """
+    return torch.norm(matrix, p='fro')
 
 def tensor_rotate_phase_to_real_axis(tensor: torch.Tensor) -> torch.Tensor:
     """
@@ -10,6 +15,15 @@ def tensor_rotate_phase_to_real_axis(tensor: torch.Tensor) -> torch.Tensor:
     """
     return torch.abs(tensor)
 
+
+def calculate_relative_contribution(mode_i: torch.Tensor, mode_j: torch.Tensor) -> torch.Tensor:
+    """
+    Calculate the relative contribution of mode j to mode i.
+    """
+    norm_mode_i = calculate_norm(mode_i)
+    norm_mode_j = calculate_norm(mode_j)
+
+    return (norm_mode_i / norm_mode_j) * 100
 
 def complex_from_magnitude_phase(magnitude: torch.Tensor, phase: torch.Tensor) -> torch.Tensor:
     """
@@ -27,6 +41,21 @@ def complex_to_magnitude_phase(complex_tensor: torch.Tensor) -> tuple[torch.Tens
     magnitude = torch.abs(complex_tensor)
     phase = torch.angle(complex_tensor)
     return magnitude, phase
+
+
+def get_conjugate(complex_tensor: torch.Tensor) -> torch.Tensor:
+    """
+    Get the conjugate of a complex tensor.
+    """
+    return complex_tensor.conj()
+
+def simplify_complex_tensor(complex_tensor: torch.Tensor) -> torch.Tensor:
+    """
+    Simplify a complex tensor.
+    """
+    real_values = complex_tensor.real
+    imag_values = complex_tensor.imag
+    return torch.atan2(imag_values, real_values)
 
 
 def motion_spectrum_2_complex(
@@ -73,6 +102,17 @@ def normalize_modal_coordinate(
     """
     norm = torch.linalg.norm(modal_coordinate, dim=1, ord=2)
     return modal_coordinate / norm.unsqueeze(-1)
+
+def orthonormal_normalization(
+    complex_tensor: torch.Tensor
+) -> torch.Tensor:
+    """
+    Compute the orthonormal normalization of a complex tensor.
+    """
+    shape = complex_tensor.shape
+    shape_range = tuple(range(1, len(shape)))
+    norm = torch.linalg.vector_norm(complex_tensor, dim=shape_range, keepdim=True)
+    return complex_tensor / norm
 
 
 def plot_modal_coordinates(

@@ -122,7 +122,7 @@ class InteractiveDemo(object):
         self.alpha = rayleigh_mass
         self.beta = rayleigh_stiffness
         self.mass = torch.ones(self.motion_spectrum.shape[0]).to(device)
-        self.rest_force = torch.zeros(self.motion_spectrum.shape[0], 2).to(device, dtype=torch.cfloat)
+        self.rest_force = 10 * torch.zeros(self.motion_spectrum.shape[0], 2).to(device, dtype=torch.cfloat)
 
     def _init_pygame(
         self,
@@ -418,7 +418,7 @@ class InteractiveDemo(object):
         model, transform = load_depth_model_and_transform(depth_model_type)
         model.eval()
         model.to(device)
-        depth_map = calculate_depth_map(model, transform, reference_frame)
+        depth_map = calculate_depth_map(model, transform, reference_frame, device)
         return depth_map
 
 

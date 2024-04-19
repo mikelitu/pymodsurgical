@@ -1,14 +1,14 @@
 {
     "liver": {
         "video_path": "videos/liver_stereo.avi",
-        "fps": 20,
+        "fps": 24,
         "solver_time_step": 0.1,
         "start": 0,
         "end": 0,
         "K": 16,
         "depth_model_type": "DPT_Large",
-        "norm_scale": 20,
-        "alpha_limit": 3.0,
+        "norm_scale": 10,
+        "alpha_limit": 20.0,
         "force_scale": 0.35,
         "display_cropping": [30, 30],
         "filtering": true,
