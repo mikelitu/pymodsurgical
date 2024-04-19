@@ -1,5 +1,4 @@
 import torch
-import numpy as np
 import complex
 
 def normalize_displacement_map(displacement_map: torch.Tensor) -> torch.Tensor:

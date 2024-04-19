@@ -1,16 +1,15 @@
 import pygame
-from motion_spectrum import calculate_motion_spectrum, resize_spectrum_2_reference
+import motion_spectrum
 from video_reader import VideoReader, RetType
-from displacement import calculate_deformation_map_from_displacement, calculate_deformation_map_from_modal_coordinate, calculate_modal_coordinate
+import displacement
 import torch
-from complex import motion_spectrum_2_complex
+import complex
 import json
 from pathlib import Path, PosixPath
 from masking import Masking
 import math
-from optical_flow import warp_flow, get_motion_frequencies
+import optical_flow
 import numpy as np
-import torch.nn as nn
 from enum import StrEnum
 
 try:
@@ -22,8 +21,8 @@ except OSError:
     pass
 
 import time
-from depth import calculate_depth_map, load_depth_model_and_transform, apply_depth_culling, ModelType
-from ode_solver import euler_solver
+import depth
+import ode_solver
 
 
 rad = math.pi / 180
@@ -72,7 +71,7 @@ class InteractiveDemo(object):
         start: int = 0,
         end: int = 0,
         K: int = 16,
-        depth_model_type: ModelType | str = ModelType.DPT_Large,
+        depth_model_type: depth.ModelType | str = depth.ModelType.DPT_Large,
         control_type: str = ControlType.MOUSE,
         norm_scale: float = 10.0,
         alpha_limit: float = 5.0,
@@ -99,9 +98,8 @@ class InteractiveDemo(object):
         self.inverse = inverse
         # Normalize depth map for depth culling
         self.depth_map = (self.depth_map - self.depth_map.min()) / (self.depth_map.max() - self.depth_map.min())
-        display_frame = apply_depth_culling(self.depth_map[0], self.reference_frame, self.near, self.far, self.inverse)
-        # display_frame = apply_depth_culling(self.depth_map[0], self.reference_frame[0])
-        self._get_motion_spectrum_from_video(frames, K, filtering, masking)
+        display_frame = depth.apply_depth_culling(self.depth_map[0], self.reference_frame, self.near, self.far, self.inverse)
+        self._get_mode_shapes_from_video(frames, K, filtering, masking)
         self._control_func = {ControlType.MOUSE: self.mouse_control, ControlType.HAPTIC: self.haptic_control}[control_type]
         self.control_type = control_type
         if control_type == ControlType.HAPTIC:
@@ -115,14 +113,14 @@ class InteractiveDemo(object):
         self.alpha_limit = alpha_limit
         self.norm_scale = norm_scale
         timesteps = len(frames[0]) if isinstance(frames, tuple) else len(frames)
-        self.frequencies = get_motion_frequencies(timesteps, K, 1 / fps)
+        self.frequencies = optical_flow.get_motion_frequencies(timesteps, K, 1 / fps)
         self.solve = False
         self.fps = fps
         self.solver_time_step = solver_time_step
         self.alpha = rayleigh_mass
         self.beta = rayleigh_stiffness
-        self.mass = torch.ones(self.motion_spectrum.shape[0]).to(device)
-        self.rest_force = 10 * torch.zeros(self.motion_spectrum.shape[0], 2).to(device, dtype=torch.cfloat)
+        self.mass = torch.ones(self.mode_shapes.shape[0]).to(device)
+        self.rest_force = 10 * torch.zeros(self.mode_shapes.shape[0], 2).to(device, dtype=torch.cfloat)
 
     def _init_pygame(
         self,
@@ -277,9 +275,9 @@ class InteractiveDemo(object):
                 self.calc_pixel = self.pixel
 
                 if isinstance(self.motion_spectrum, tuple):
-                    self.modal_coordinates = calculate_modal_coordinate(self.motion_spectrum[0], -self.displacement, self.calc_pixel, self.alpha)
+                    self.modal_coordinates = displacement.calculate_modal_coordinate(self.motion_spectrum[0], -self.displacement, self.calc_pixel, self.alpha)
                 else:
-                    self.modal_coordinates = calculate_modal_coordinate(self.motion_spectrum, -self.displacement, self.calc_pixel, self.alpha)
+                    self.modal_coordinates = displacement.calculate_modal_coordinate(self.motion_spectrum, -self.displacement, self.calc_pixel, self.alpha)
             
             if event.type == pygame.MOUSEMOTION:
                 if self.on_click:
@@ -316,7 +314,7 @@ class InteractiveDemo(object):
         Solve the ODE for the modal coordinates.
         """
 
-        self.modal_coordinates = euler_solver(
+        self.modal_coordinates = ode_solver.euler_solver(
             self.modal_coordinates, 
             self.frequencies, 
             self.mass, 
@@ -327,9 +325,9 @@ class InteractiveDemo(object):
         )
         
         if isinstance(self.motion_spectrum, tuple):
-            deformation_map = calculate_deformation_map_from_modal_coordinate(self.motion_spectrum[0], self.modal_coordinates)
+            deformation_map = displacement.calculate_deformation_map_from_modal_coordinate(self.motion_spectrum[0], self.modal_coordinates)
         else:
-            deformation_map = calculate_deformation_map_from_modal_coordinate(self.motion_spectrum, self.modal_coordinates)
+            deformation_map = displacement.calculate_deformation_map_from_modal_coordinate(self.motion_spectrum, self.modal_coordinates)
 
         return deformation_map
 
@@ -354,12 +352,12 @@ class InteractiveDemo(object):
             pygame.draw.circle(screen, color, pos, radius)
 
         if self.pixel is not None and self.on_click:
-            if isinstance(self.motion_spectrum, tuple):
-                deformation_map, _ = calculate_deformation_map_from_displacement(self.motion_spectrum[0], -self.displacement, self.pixel, self.alpha)
+            if isinstance(self.mode_shapes, tuple):
+                deformation_map, _ = displacement.calculate_deformation_map_from_displacement(self.mode_shapes[0], -self.displacement, self.pixel, self.alpha)
             else:
-                deformation_map, _ = calculate_deformation_map_from_displacement(self.motion_spectrum, -self.displacement, self.pixel, self.alpha)
+                deformation_map, _ = displacement.calculate_deformation_map_from_displacement(self.mode_shapes, -self.displacement, self.pixel, self.alpha)
             
-            deformed_frame = warp_flow(torch.from_numpy(self.reference_frame).permute(2, 0, 1).float().to(device), deformation_map.to(device), self.depth_map, self.mask, self.near, self.far, self.inverse)
+            deformed_frame = optical_flow.warp_flow(torch.from_numpy(self.reference_frame).permute(2, 0, 1).float().to(device), deformation_map.to(device), self.depth_map, self.mask, self.near, self.far, self.inverse)
             deformed_frame = self._crop_image_for_display(deformed_frame, (self.reference_frame.shape[0] - self.display_cropping[0], self.reference_frame.shape[1] - self.display_cropping[1]))
             deformed_frame_surf = pygame.transform.rotate(pygame.transform.flip(pygame.surfarray.make_surface(deformed_frame), False, True), -90)
             self.screen.blit(deformed_frame_surf, (0, 0))
@@ -368,7 +366,7 @@ class InteractiveDemo(object):
         
         elif self.solve:
             deformation_map = self._solve_ode()
-            deformed_frame = warp_flow(torch.from_numpy(self.reference_frame).permute(2, 0, 1).float().to(device), deformation_map.to(device), self.depth_map, self.mask, self.near, self.far, self.inverse)
+            deformed_frame = optical_flow.warp_flow(torch.from_numpy(self.reference_frame).permute(2, 0, 1).float().to(device), deformation_map.to(device), self.depth_map, self.mask, self.near, self.far, self.inverse)
             deformed_frame = self._crop_image_for_display(deformed_frame, (self.reference_frame.shape[0] - self.display_cropping[0], self.reference_frame.shape[1] - self.display_cropping[1]))
             deformed_frame_surf = pygame.transform.rotate(pygame.transform.flip(pygame.surfarray.make_surface(deformed_frame), False, True), -90)
             self.screen.blit(deformed_frame_surf, (0, 0))
@@ -410,19 +408,19 @@ class InteractiveDemo(object):
     def _get_depth_map(
         self,
         reference_frame: np.ndarray,
-        depth_model_type: ModelType | str
+        depth_model_type: depth.ModelType | str
     ) -> np.ndarray:
         """
         Initialize the depth model and calculate the depth map for the reference frame.
         """
-        model, transform = load_depth_model_and_transform(depth_model_type)
+        model, transform = depth.load_depth_model_and_transform(depth_model_type)
         model.eval()
         model.to(device)
-        depth_map = calculate_depth_map(model, transform, reference_frame, device)
+        depth_map = depth.calculate_depth_map(model, transform, reference_frame, device)
         return depth_map
 
 
-    def _get_motion_spectrum_from_video(
+    def _get_mode_shapes_from_video(
         self,
         frames: np.ndarray | tuple[np.ndarray, np.ndarray],
         K: int,
@@ -439,12 +437,12 @@ class InteractiveDemo(object):
             mask = None
             self.mask = None
         if isinstance(frames, tuple):
-            motion_spectrum = (calculate_motion_spectrum(frames[0], K, filtered=filtering, mask=mask, camera_pos="left", save_flow_video=False), calculate_motion_spectrum(frames[1], K, filtered=filtering, mask=mask, camera_pos="right"))
-            motion_spectrum = resize_spectrum_2_reference(motion_spectrum, self.reference_frame)
-            self.motion_spectrum, _ = motion_spectrum_2_complex(motion_spectrum)
+            mode_shapes = (motion_spectrum.calculate_motion_spectrum(frames[0], K, filtered=filtering, mask=mask, camera_pos="left", save_flow_video=False), motion_spectrum.calculate_motion_spectrum(frames[1], K, filtered=filtering, mask=mask, camera_pos="right"))
+            mode_shapes = motion_spectrum.resize_spectrum_2_reference(mode_shapes, self.reference_frame)
+            self.mode_shapes, _ = complex.motion_spectrum_2_complex(mode_shapes)
         else:
-            motion_spectrum = calculate_motion_spectrum(frames, K, filtered=filtering, mask=mask)
-            self.motion_spectrum = motion_spectrum_2_complex(resize_spectrum_2_reference(motion_spectrum, self.reference_frame)) 
+            mode_shapes = motion_spectrum.calculate_motion_spectrum(frames, K, filtered=filtering, mask=mask)
+            self.mode_shapes = complex.motion_spectrum_2_complex(motion_spectrum.resize_spectrum_2_reference(mode_shapes, self.reference_frame)) 
     
 
     def _crop_image_for_display(
