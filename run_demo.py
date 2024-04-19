@@ -18,7 +18,7 @@ def main():
     control = args.control
 
     # Load the configuration file
-    config_file = Path('demos/config.json')
+    config_file = Path('config/demos.json')
     with open(config_file) as f:
         config = json.load(f)
 
