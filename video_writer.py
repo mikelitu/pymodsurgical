@@ -4,7 +4,7 @@ from pathlib import Path
 from enum import Enum
 import torch
 from video_reader import VideoType
-from optical_flow import flow_to_image
+from torchvision.utils import flow_to_image
 
 
 class VideoWriter(object):
@@ -40,7 +40,10 @@ class VideoWriter(object):
                 frame = frame.permute(1, 2, 0).cpu().numpy()
                 
             # Ensure frame is uint8
-            if frame.dtype == torch.float32 or frame.dtype == np.float32:
+            if frame.dtype == torch.float32:
+                frame = (frame * 255).to(dtype=torch.uint8).cpu().numpy()
+            
+            elif frame.dtype == np.float32:
                 frame = (frame * 255).astype(np.uint8)
 
             out.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))

@@ -81,9 +81,11 @@ class InteractiveDemo(object):
         masking: bool = True,
         near: float = 0.05,
         far: float = 0.95,
+        mass: float = 1.0,
+        rest_force: float = 10.0,
         inverse: bool = False,
-        rayleigh_mass: float = 0.1,
-        rayleigh_stiffness: float = 0.1
+        rayleigh_mass: float = 0.5,
+        rayleigh_stiffness: float = 0.5
     ) -> None:
 
         frames = self._init_video_reader(video_path, start, end)
@@ -117,10 +119,10 @@ class InteractiveDemo(object):
         self.solve = False
         self.fps = fps
         self.solver_time_step = solver_time_step
-        self.alpha = rayleigh_mass
-        self.beta = rayleigh_stiffness
-        self.mass = torch.ones(self.mode_shapes.shape[0]).to(device)
-        self.rest_force = 10 * torch.zeros(self.mode_shapes.shape[0], 2).to(device, dtype=torch.cfloat)
+        self.rayleigh_mass = rayleigh_mass
+        self.rayleigh_stiffness = rayleigh_stiffness
+        self.mass = mass * torch.ones(self.mode_shapes.shape[0]).to(device)
+        self.rest_force = rest_force * torch.ones(self.mode_shapes.shape[0], 2).to(device, dtype=torch.cfloat)
 
     def _init_pygame(
         self,
@@ -274,10 +276,10 @@ class InteractiveDemo(object):
                 self.solve = True
                 self.calc_pixel = self.pixel
 
-                if isinstance(self.motion_spectrum, tuple):
-                    self.modal_coordinates = displacement.calculate_modal_coordinate(self.motion_spectrum[0], -self.displacement, self.calc_pixel, self.alpha)
+                if isinstance(self.mode_shapes, tuple):
+                    self.modal_coordinates = displacement.calculate_modal_coordinate(self.mode_shapes[0], -self.displacement, self.calc_pixel, self.alpha)
                 else:
-                    self.modal_coordinates = displacement.calculate_modal_coordinate(self.motion_spectrum, -self.displacement, self.calc_pixel, self.alpha)
+                    self.modal_coordinates = displacement.calculate_modal_coordinate(self.mode_shapes, -self.displacement, self.calc_pixel, self.alpha)
             
             if event.type == pygame.MOUSEMOTION:
                 if self.on_click:
@@ -319,15 +321,15 @@ class InteractiveDemo(object):
             self.frequencies, 
             self.mass, 
             self.rest_force, 
-            alpha=self.alpha, 
-            beta=self.beta, 
+            alpha=self.rayleigh_mass, 
+            beta=self.rayleigh_stiffness, 
             time_step=self.solver_time_step
         )
         
-        if isinstance(self.motion_spectrum, tuple):
-            deformation_map = displacement.calculate_deformation_map_from_modal_coordinate(self.motion_spectrum[0], self.modal_coordinates)
+        if isinstance(self.mode_shapes, tuple):
+            deformation_map = displacement.calculate_deformation_map_from_modal_coordinate(self.mode_shapes[0], self.modal_coordinates)
         else:
-            deformation_map = displacement.calculate_deformation_map_from_modal_coordinate(self.motion_spectrum, self.modal_coordinates)
+            deformation_map = displacement.calculate_deformation_map_from_modal_coordinate(self.mode_shapes, self.modal_coordinates)
 
         return deformation_map
 

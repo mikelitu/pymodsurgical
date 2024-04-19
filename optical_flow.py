@@ -2,7 +2,6 @@ import torch
 import torchvision
 import torchvision.transforms as T
 from torchvision.models.optical_flow import raft_large, Raft_Large_Weights
-from torchvision.utils import flow_to_image, _make_colorwheel
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import PosixPath

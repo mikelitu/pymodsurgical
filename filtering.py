@@ -68,23 +68,42 @@ class GaussianFiltering:
             if not isinstance(flow, tuple):
                 raise ValueError("Flow must be a tuple if the image is a tuple")
             if isinstance(img[0], torch.Tensor):
+                if not isinstance(flow[0], torch.Tensor):
+                    raise ValueError("Flow must be a torch.Tensor if the image is a torch.Tensor")
                 img_array = (img[0].permute(0, 2, 3, 1).detach().cpu().numpy(), img[1].permute(0, 2, 3, 1).detach().cpu().numpy())
                 flow_array = (flow[0].permute(0, 2, 3, 1).detach().cpu().numpy(), flow[1].permute(0, 2, 3, 1).detach().cpu().numpy())
                 transform_2_torch = True
+            elif isinstance(flow[0], torch.Tensor):
+                raise ValueError("Image must be a torch.Tensor if flow is a torch.Tensor")
+            
             else:
+                img_array = (img[0][np.newaxis], img[1][np.newaxis])
+                flow_array = (flow[0][np.newaxis], flow[1][np.newaxis])
                 transform_2_torch = False
+
             filtered_flow = self._filter_stereo_video(img_array, flow_array)
             
             if transform_2_torch:
                 filtered_flow = ([torch.from_numpy(frame).permute(2, 0, 1) for frame in filtered_flow[0]], [torch.from_numpy(frame).permute(2, 0, 1) for frame in filtered_flow[1]])
                 filtered_flow = (torch.stack(filtered_flow[0]).to(flow[0].device), torch.stack(filtered_flow[1]).to(flow[1].device))
-                
+        
+        elif isinstance(flow, tuple):
+            raise ValueError("Image must be a tuple if flow is a tuple")     
+        
         else:
             if isinstance(img, torch.Tensor):
+                if not isinstance(flow, torch.Tensor):
+                    raise ValueError("Flow must be a torch.Tensor if the image is a torch.Tensor")
                 img_array = img.permute(0, 2, 3, 1).detach().cpu().numpy()
                 flow_array = flow.permute(0, 2, 3, 1).detach().cpu().numpy()
                 transform_2_torch = True
+            
+            elif isinstance(flow, torch.Tensor):
+                raise ValueError("Image must be a torch.Tensor if flow is a torch.Tensor")
+            
             else:
+                img_array = img[np.newaxis]
+                flow_array = flow[np.newaxis]
                 transform_2_torch = False
 
             filtered_flow = self._filter_mono_video(img_array, flow_array)
@@ -92,6 +111,9 @@ class GaussianFiltering:
             if transform_2_torch:
                 filtered_flow = [torch.from_numpy(frame).permute(2, 0, 1) for frame in filtered_flow]
                 filtered_flow = torch.stack(filtered_flow).to(flow.device)
+            else:
+                
+                filtered_flow = np.stack(filtered_flow)
 
         return filtered_flow
 
