@@ -1,6 +1,5 @@
 from video_reader import VideoReader, RetType
 import json
-from pathlib import Path
 import unittest
 import torch
 import numpy as np

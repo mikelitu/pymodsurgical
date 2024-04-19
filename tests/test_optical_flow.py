@@ -116,42 +116,6 @@ class TestOpticalFlow(unittest.TestCase):
         img = np.random.randn(1, 3, 256, 256)
         with self.assertRaises(AttributeError):
             grid = optical_flow.make_grid(img)
-    
-
-    # def test_warp_flow(self):
-    #     # Test case 1: Single channel image, 2D flow
-    #     img = 255 * torch.tensor([[[0.5, 0.5, 0.5], [0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]])
-    #     flow = torch.tensor([[[0., 0., 0.], [0., 0., 0.], [0., 0., 0.]]])
-    #     print(img.shape, flow.shape)
-    #     depth_map = np.ones((3, 3))
-    #     warped_img = optical_flow.warp_flow(img, flow, depth_map, far=1.0, near=0.0)
-    #     expected_warped_img = 255 * torch.tensor([[[0.5, 0.5, 0.5], [0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]]).permute(1, 2, 0).cpu().numpy() 
-    #     self.assertTrue(torch.allclose(warped_img, expected_warped_img, atol=1e-2))
-
-    #     # Test case 2: RGB image, 3D flow
-    #     img = torch.tensor([[[[0.5, 0.5, 0.5], [0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]]])
-    #     flow = torch.tensor([[[[0.1, 0.1, 0.1], [0.1, 0.1, 0.1], [0.1, 0.1, 0.1]]]])
-    #     depth_map = np.ones((1, 3, 3))
-    #     warped_img = optical_flow.warp_flow(img, flow, depth_map)
-    #     expected_warped_img = np.array([[[[0.5, 0.5, 0.5], [0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]]])
-    #     self.assertTrue(np.testing.assert_array_almost_equal(warped_img, expected_warped_img))
-
-    #     # Test case 3: Inverse warp
-    #     img = torch.tensor([[[0.5, 0.5, 0.5], [0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]])
-    #     flow = torch.tensor([[[0.1, 0.1, 0.1], [0.1, 0.1, 0.1], [0.1, 0.1, 0.1]]])
-    #     depth_map = np.ones((3, 3))
-    #     warped_img = optical_flow.warp_flow(img, flow, depth_map, inverse=True)
-    #     expected_warped_img = np.array([[[0.5, 0.5, 0.5], [0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]])
-    #     self.assertTrue(np.testing.assert_array_almost_equal(warped_img, expected_warped_img))
-
-    #     # Test case 4: Masked warp
-    #     img = torch.tensor([[[0.5, 0.5, 0.5], [0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]])
-    #     flow = torch.tensor([[[0.1, 0.1, 0.1], [0.1, 0.1, 0.1], [0.1, 0.1, 0.1]]])
-    #     depth_map = np.ones((3, 3))
-    #     mask = np.ones((3, 3))
-    #     warped_img = optical_flow.warp_flow(img, flow, depth_map, mask=mask)
-    #     expected_warped_img = np.array([[[0.5, 0.5, 0.5], [0.5, 0.5, 0.5], [0.5, 0.5, 0.5]]])
-    #     self.assertTrue(np.testing.assert_array_almost_equal(warped_img, expected_warped_img))
 
 
 if __name__ == "__main__":
