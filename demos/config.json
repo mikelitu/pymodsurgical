@@ -7,15 +7,17 @@
         "end": 0,
         "K": 16,
         "depth_model_type": "DPT_Large",
-        "norm_scale": 10,
-        "alpha_limit": 20.0,
+        "norm_scale": 20,
+        "alpha_limit": 5.0,
         "force_scale": 0.35,
         "display_cropping": [30, 30],
         "filtering": true,
         "masking": true,
         "near": 0.05,
         "far": 0.95,
-        "inverse": false
+        "inverse": false,
+        "mass": 10.0,
+        "rest_force": 0.0
     },
 
     "diaphragm": {
@@ -35,5 +37,26 @@
         "near": 0.05,
         "far": 0.95,
         "inverse": true
+    },
+
+    "heart": {
+        "video_path": "videos/test_video.mp4",
+        "fps": 24,
+        "solver_time_step": 0.05,
+        "start": 0,
+        "end": 0,
+        "K": 16,
+        "depth_model_type": "DPT_Large",
+        "norm_scale": 30,
+        "alpha_limit": 4.0,
+        "force_scale": 0.35,
+        "display_cropping": [30, 30],
+        "filtering": true,
+        "masking": true,
+        "near": 0.0,
+        "far": 1.0,
+        "inverse": false,
+        "mass": 30.0,
+        "rest_force": 0.0
     }
 }
