@@ -46,6 +46,7 @@ class VideoReader(object):
         
         except Exception:
             print("Calibration cofficients not found in metadata...")
+            print("Starting reader without calibration params!")
 
     def _read_mono(
         self, 
