@@ -1,4 +1,4 @@
-from pymodal_surgical.video_reader import VideoReader, RetType
+from pymodal_surgical.video_processing.reader import VideoReader, RetType
 import json
 import unittest
 import torch

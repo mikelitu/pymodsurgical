@@ -1,16 +1,18 @@
 import unittest
-from pymodal_surgical.video_writer import VideoWriter
+from pymodal_surgical.video_processing.writer import VideoWriter
 import numpy as np
-from pymodal_surgical.video_reader import VideoReader, RetType
+from pymodal_surgical.video_processing.reader import VideoReader, RetType
 from pathlib import Path
 import shutil
+
+script_dir = Path(__file__).resolve().parent
 
 
 class TestVideoWriter(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.save_path = Path("tests/video_test")
-        cls.save_path.mkdir(exist_ok=True)
+        cls.save_path = script_dir/"video_test"
+        cls.save_path.mkdir(exist_ok=True, parents=True)
         video_config_dic = {
             "output_mono": {
                 "fps": 30,

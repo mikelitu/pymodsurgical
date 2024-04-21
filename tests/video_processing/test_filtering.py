@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from pymodal_surgical.filtering import GaussianFiltering
+from pymodal_surgical.video_processing.filtering import GaussianFiltering
 import unittest
 
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
