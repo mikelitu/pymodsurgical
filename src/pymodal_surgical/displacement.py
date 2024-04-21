@@ -1,5 +1,5 @@
 import torch
-import pymodal_surgical.complex as complex
+from . import complex
 
 def normalize_displacement_map(displacement_map: torch.Tensor) -> torch.Tensor:
     return (displacement_map - displacement_map.min()) / (displacement_map.max() - displacement_map.min())

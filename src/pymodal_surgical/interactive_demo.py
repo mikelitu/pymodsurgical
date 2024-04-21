@@ -1,11 +1,10 @@
 import pygame
-from pymodal_surgical import motion_spectrum, optical_flow, displacement
-from pymodal_surgical.video_reader import VideoReader, RetType
+from . import motion_spectrum, optical_flow, displacement, complex
+from video_processing.reader import VideoReader, RetType
 import torch
-import pymodal_surgical.complex
 import json
 from pathlib import Path, PosixPath
-from pymodal_surgical.masking import Masking
+from video_processing.masking import Masking
 import math
 import numpy as np
 from enum import StrEnum
@@ -439,10 +438,10 @@ class InteractiveDemo(object):
         if isinstance(frames, tuple):
             mode_shapes = (motion_spectrum.calculate_motion_spectrum(frames[0], K, filtered=filtering, mask=mask, camera_pos="left", save_flow_video=False), motion_spectrum.calculate_motion_spectrum(frames[1], K, filtered=filtering, mask=mask, camera_pos="right"))
             mode_shapes = motion_spectrum.resize_spectrum_2_reference(mode_shapes, self.reference_frame)
-            self.mode_shapes, _ = pymodal_surgical.complex.motion_spectrum_2_complex(mode_shapes)
+            self.mode_shapes, _ = complex.motion_spectrum_2_complex(mode_shapes)
         else:
             mode_shapes = motion_spectrum.calculate_motion_spectrum(frames, K, filtered=filtering, mask=mask)
-            self.mode_shapes = pymodal_surgical.complex.motion_spectrum_2_complex(motion_spectrum.resize_spectrum_2_reference(mode_shapes, self.reference_frame)) 
+            self.mode_shapes = complex.motion_spectrum_2_complex(motion_spectrum.resize_spectrum_2_reference(mode_shapes, self.reference_frame)) 
     
 
     def _crop_image_for_display(

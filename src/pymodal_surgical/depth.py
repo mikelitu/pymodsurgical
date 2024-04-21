@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 import numpy as np
 from enum import StrEnum
-from pymodal_surgical.utils import _norm_numpy, _norm_torch
+from .utils import _norm_numpy, _norm_torch
 from sklearn.cluster import KMeans
 
 model_hub = "intel-isl/MiDaS"

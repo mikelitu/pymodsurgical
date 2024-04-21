@@ -1,8 +1,8 @@
 from pymodal_surgical import motion_spectrum, displacement, optical_flow
 from pathlib import Path, PosixPath
-from pymodal_surgical.video_reader import VideoReader, VideoType, RetType
+from pymodal_surgical.video_processing.reader import VideoReader, VideoType, RetType
 import json
-from pymodal_surgical.masking import Masking
+from pymodal_surgical.video_processing.masking import Masking
 import torch
 from pymodal_surgical.complex import motion_spectrum_2_complex, save_modal_coordinates
 from torchvision.utils import flow_to_image

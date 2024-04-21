@@ -1,10 +1,10 @@
-from pymodal_surgical import optical_flow, depth, utils
+from . import optical_flow, depth, utils
 from pathlib import PosixPath
 import torch
 import numpy as np
-from pymodal_surgical.filtering import GaussianFiltering
-from pymodal_surgical.masking import Masking
-from pymodal_surgical.video_writer import VideoWriter
+from .video_processing.filtering import GaussianFiltering
+from .video_processing.masking import Masking
+from .video_processing.writer import VideoWriter
 
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
 model = optical_flow.load_flow_model(device)

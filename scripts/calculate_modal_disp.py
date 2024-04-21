@@ -1,9 +1,9 @@
 import pymodal_surgical
 from pymodal_surgical import motion_spectrum, optical_flow, displacement
 from pathlib import Path, PosixPath
-from pymodal_surgical.video_reader import VideoReader, RetType
+from pymodal_surgical.video_processing.reader import VideoReader, RetType
 import json
-from pymodal_surgical.masking import Masking
+from pymodal_surgical.video_processing.masking import Masking
 import torch
 import pymodal_surgical.complex
 
