@@ -3,7 +3,7 @@ import numpy as np
 from pathlib import PosixPath, Path
 import torch
 import torch.nn.functional as F
-from pymodal_surgical.video_reader import VideoType
+from .reader import VideoType
 
 
 class Masking(object):

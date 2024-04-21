@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from pathlib import Path
 import torch
-from pymodal_surgical.video_reader import VideoType
+from .reader import VideoType
 from torchvision.utils import flow_to_image
 
 
