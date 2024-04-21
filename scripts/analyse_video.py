@@ -1,18 +1,16 @@
-from motion_spectrum import calculate_motion_spectrum, save_motion_spectrum
+from pymodal_surgical import motion_spectrum, displacement, optical_flow
 from pathlib import Path, PosixPath
-from video_reader import VideoReader, VideoType, RetType
+from pymodal_surgical.video_reader import VideoReader, VideoType, RetType
 import json
-from masking import Masking
-from displacement import calculate_deformation_map_from_displacement
+from pymodal_surgical.masking import Masking
 import torch
-from complex import motion_spectrum_2_complex, save_modal_coordinates
-from optical_flow import plot_and_save
+from pymodal_surgical.complex import motion_spectrum_2_complex, save_modal_coordinates
 from torchvision.utils import flow_to_image
 
 
 def main(
     video_reader: VideoReader,
-    displacement: torch.Tensor,
+    disp: torch.Tensor,
     pixel: tuple[int, int],
     start: int = 0, 
     end: int = 0, 
@@ -31,33 +29,33 @@ def main(
         mask = None
 
     if isinstance(frames, tuple):
-        motion_spectrum = (calculate_motion_spectrum(frames[0], K, filtered=filtering, mask=mask, camera_pos="left", save_flow_video=True), calculate_motion_spectrum(frames[1], K, filtered=filtering, mask=mask, camera_pos="right"))
+        mode_shapes = (motion_spectrum.calculate_motion_spectrum(frames[0], K, filtered=filtering, mask=mask, camera_pos="left", save_flow_video=True), motion_spectrum.calculate_motion_spectrum(frames[1], K, filtered=filtering, mask=mask, camera_pos="right"))
     else:
-        motion_spectrum = calculate_motion_spectrum(frames, K, filtered=filtering, mask=mask)
+        mode_shapes = motion_spectrum.calculate_motion_spectrum(frames, K, filtered=filtering, mask=mask)
     
     if save_dir is not None:
-        save_motion_spectrum(motion_spectrum, save_dir, filtered=filtering, masked=masking)
+        motion_spectrum.save_motion_spectrum(mode_shapes, save_dir, filtered=filtering, masked=masking)
     
-    complex_motion_spectrum = motion_spectrum_2_complex(motion_spectrum)
+    complex_mode_shapes = motion_spectrum_2_complex(mode_shapes)
     
-    if isinstance(complex_motion_spectrum, tuple):
-        displacement = displacement.to(complex_motion_spectrum[0].device, dtype=complex_motion_spectrum[0].dtype)
+    if isinstance(complex_mode_shapes, tuple):
+        disp = disp.to(complex_mode_shapes[0].device, dtype=complex_mode_shapes[0].dtype)
         for i in range(2):
-            deformation_map, modal_coordinates = calculate_deformation_map_from_displacement(complex_motion_spectrum[i], displacement, pixel)
+            deformation_map, modal_coordinates = displacement.calculate_deformation_map_from_displacement(complex_mode_shapes[i], displacement, pixel)
             deformation_map_img = flow_to_image(deformation_map.unsqueeze(0))
-            save_modal_coordinates(modal_coordinates, save_dir, displacement, pixel)
-            plot_and_save(deformation_map_img, "test/displacement_map_{}.png".format(i))
+            save_modal_coordinates(modal_coordinates, save_dir, disp, pixel)
+            optical_flow.plot_and_save(deformation_map_img, "test/displacement_map_{}.png".format(i))
     else:
-        displacement = displacement.to(complex_motion_spectrum.device, dtype=complex_motion_spectrum.dtype)
-        deformation_map, modal_coordinates = calculate_deformation_map_from_displacement(complex_motion_spectrum, displacement, pixel)
+        disp = disp.to(complex_mode_shapes.device, dtype=complex_mode_shapes.dtype)
+        deformation_map, modal_coordinates = displacement.calculate_deformation_map_from_displacement(complex_mode_shapes, disp, pixel)
         deformation_map_img = flow_to_image(deformation_map.unsqueeze(0))
-        plot_and_save(deformation_map_img, save_dir/"deformation_map.png")
+        optical_flow.plot_and_save(deformation_map_img, save_dir/"deformation_map.png")
 
 
 if __name__ == "__main__":
     video_path = Path("videos/test_video.mp4")
     K = 16
-    displacement = torch.tensor([1.0, 0.0])
+    disp = torch.tensor([1.0, 0.0])
     pixel = (64, 64)
     with open("videos/metadata.json", "r") as f:
         metadata = json.load(f)
@@ -66,6 +64,6 @@ if __name__ == "__main__":
     reader = VideoReader(video_path, video_config=metadata, return_type=RetType.NUMPY)
     
     # Apply all combinations of filtering and masking
-    main(reader, displacement, pixel, K=K, save_dir="spectrums", filtering=True, masking=True)
+    main(reader, disp, pixel, K=K, save_dir="spectrums", filtering=True, masking=True)
     
 

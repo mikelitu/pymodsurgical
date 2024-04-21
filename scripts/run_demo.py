@@ -1,4 +1,4 @@
-from interactive_demo import InteractiveDemo
+from pymodal_surgical.interactive_demo import InteractiveDemo
 import json
 import argparse
 from pathlib import Path
