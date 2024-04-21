@@ -1,7 +1,7 @@
 import unittest
-from video_writer import VideoWriter
+from pymodal_surgical.video_writer import VideoWriter
 import numpy as np
-from video_reader import VideoReader, RetType
+from pymodal_surgical.video_reader import VideoReader, RetType
 from pathlib import Path
 import shutil
 

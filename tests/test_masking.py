@@ -1,8 +1,8 @@
 import unittest
 import numpy as np
 from PIL import Image
-from masking import Masking
-import utils
+from pymodal_surgical.masking import Masking
+from pymodal_surgical import utils
 import shutil
 
 def create_and_save_mask():

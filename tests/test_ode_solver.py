@@ -1,4 +1,4 @@
-import ode_solver 
+from pymodal_surgical import ode_solver
 import unittest
 import numpy as np
 import torch

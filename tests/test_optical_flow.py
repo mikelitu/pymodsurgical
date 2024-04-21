@@ -1,5 +1,5 @@
 import torch
-import optical_flow
+from pymodal_surgical import optical_flow
 import unittest
 import numpy as np
 
