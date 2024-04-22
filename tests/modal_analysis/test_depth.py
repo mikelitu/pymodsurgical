@@ -1,5 +1,5 @@
 from pymodal_surgical.video_processing.reader import VideoReader
-from pymodal_surgical import depth
+from pymodal_surgical.modal_analysis import depth
 import torch
 from pathlib import Path
 import json

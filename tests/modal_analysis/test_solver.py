@@ -1,4 +1,4 @@
-from pymodal_surgical import ode_solver
+from pymodal_surgical.modal_analysis import solver
 import unittest
 import numpy as np
 import torch
@@ -15,7 +15,7 @@ class TestSolver(unittest.TestCase):
         beta = 0.1
         time_step = 0.1
 
-        result = ode_solver.euler_solver(modal_coordinate, frequencies, modal_mass, force, alpha, beta, time_step)
+        result = solver.euler_solver(modal_coordinate, frequencies, modal_mass, force, alpha, beta, time_step)
         expected_result = torch.tensor([[1.0000+1.8600j, 1.9000+2.9400j]])
         self.assertTrue(torch.allclose(result, expected_result, atol=1e-4, rtol=1e-4))
 
@@ -28,7 +28,7 @@ class TestSolver(unittest.TestCase):
         beta = 0.2
         time_step = 0.2
 
-        result = ode_solver.euler_solver(modal_coordinate, frequencies, modal_mass, force, alpha, beta, time_step)
+        result = solver.euler_solver(modal_coordinate, frequencies, modal_mass, force, alpha, beta, time_step)
         expected_result = torch.tensor([[1.0000-1.2400j, 2.2000-1.9600j]])
         self.assertTrue(torch.allclose(result, expected_result))
 
@@ -42,7 +42,7 @@ class TestSolver(unittest.TestCase):
         time_step = 0.05
 
         
-        result = ode_solver.euler_solver(modal_coordinate, frequencies, modal_mass, force, alpha, beta, time_step)
+        result = solver.euler_solver(modal_coordinate, frequencies, modal_mass, force, alpha, beta, time_step)
         expected_result = torch.tensor([
             [1.0500+0.9400j, 2.0000+1.9800j],
             [1.7750+2.1625j, 2.6750+3.2375j]
@@ -62,7 +62,7 @@ class TestSolver(unittest.TestCase):
         time_step = 0.1
 
         with self.assertRaises(AttributeError):
-            result = ode_solver.euler_solver(modal_coordinates, frequencies, mass, force, alpha, beta, time_step)
+            result = solver.euler_solver(modal_coordinates, frequencies, mass, force, alpha, beta, time_step)
         
         # Test case 2
         modal_coordinate = torch.tensor([[1+2j, 2+3j]])
@@ -73,7 +73,7 @@ class TestSolver(unittest.TestCase):
         beta = 0.1
         time_step = 0.1
 
-        result = ode_solver.euler_solver(modal_coordinate, frequencies, modal_mass, force, alpha, beta, time_step)
+        result = solver.euler_solver(modal_coordinate, frequencies, modal_mass, force, alpha, beta, time_step)
         self.assertIsInstance(result, torch.Tensor)
         self.assertTrue(result.dtype == torch.cfloat)
         self.assertTrue(result.shape == modal_coordinate.shape)
