@@ -14,24 +14,24 @@ def mode_shapes_from_optical_flow(
     if dim not in [2, 3]:
         raise ValueError("The dimension of the flow field must be 2 for 2D tensors or 3 for 3D tensors.")
     
-    motion_texture = torch.zeros((batch_size, K, 4 if dim==2 else 6, height, width)).to(flow_field.device)
+    mode_shapes = torch.zeros((batch_size, K, 4 if dim==2 else 6, height, width)).to(flow_field.device)
     for i in range(height):
         for j in range(width):
             x_t = flow_field[:, :, 0, i, j]
             y_t = flow_field[:, :, 1, i, j]
             Y_f = torch.fft.rfft(x_t, timestep, dim=-1)
             X_f = torch.fft.rfft(y_t, timestep, dim=-1)
-            motion_texture[:, :, 0, i, j] = (1.0 / K) * X_f[:, 1:K+1].real
-            motion_texture[:, :, 1, i, j] = (1.0 / K) * X_f[:, 1:K+1].imag
-            motion_texture[:, :, 2, i, j] = (1.0 / K) * Y_f[:, 1:K+1].real
-            motion_texture[:, :, 3, i, j] = (1.0 / K) * Y_f[:, 1:K+1].imag
+            mode_shapes[:, :, 0, i, j] = (1.0 / K) * X_f[:, 1:K+1].real
+            mode_shapes[:, :, 1, i, j] = (1.0 / K) * X_f[:, 1:K+1].imag
+            mode_shapes[:, :, 2, i, j] = (1.0 / K) * Y_f[:, 1:K+1].real
+            mode_shapes[:, :, 3, i, j] = (1.0 / K) * Y_f[:, 1:K+1].imag
             if dim == 3:
                 z_t = flow_field[:, :, 2, i, j]
                 Z_f = torch.fft.rfft(z_t, timestep, dim=-1)
-                motion_texture[:, :, 4, i, j] = (1.0 / K) * Z_f[:, 1:K+1].real
-                motion_texture[:, :, 5, i, j] = (1.0 / K) * Z_f[:, 1:K+1].imag
+                mode_shapes[:, :, 4, i, j] = (1.0 / K) * Z_f[:, 1:K+1].real
+                mode_shapes[:, :, 5, i, j] = (1.0 / K) * Z_f[:, 1:K+1].imag
 
-    return motion_texture
+    return mode_shapes
 
 
 def get_motion_frequencies(
