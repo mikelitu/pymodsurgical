@@ -1,10 +1,14 @@
-from pymodal_surgical import motion_spectrum, displacement, optical_flow
+from pymodal_surgical.modal_analysis import deformation, functions
 from pathlib import Path, PosixPath
+from pymodal_surgical.modal_analysis import optical_flow
 from pymodal_surgical.video_processing.reader import VideoReader, VideoType, RetType
 import json
 from pymodal_surgical.video_processing.masking import Masking
 import torch
-from pymodal_surgical.complex import motion_spectrum_2_complex, save_modal_coordinates
+from pymodal_surgical.modal_analysis.math_helper import motion_spectrum_2_complex
+from pymodal_surgical.modal_analysis.utils import save_modal_coordinates
+from pymodal_surgical.modal_analysis.plot_utils import save_mode_shape
+from pymodal_surgical.modal_analysis.functions import calculate_mode_shapes
 from torchvision.utils import flow_to_image
 
 
@@ -29,25 +33,25 @@ def main(
         mask = None
 
     if isinstance(frames, tuple):
-        mode_shapes = (motion_spectrum.calculate_motion_spectrum(frames[0], K, filtered=filtering, mask=mask, camera_pos="left", save_flow_video=True), motion_spectrum.calculate_motion_spectrum(frames[1], K, filtered=filtering, mask=mask, camera_pos="right"))
+        mode_shapes = (calculate_mode_shapes(frames[0], K, filtered=filtering, mask=mask, camera_pos="left", save_flow_video=True), functions.calculate_motion_spectrum(frames[1], K, filtered=filtering, mask=mask, camera_pos="right"))
     else:
-        mode_shapes = motion_spectrum.calculate_motion_spectrum(frames, K, filtered=filtering, mask=mask)
+        mode_shapes = calculate_mode_shapes(frames, K, filtered=filtering, mask=mask)
     
     if save_dir is not None:
-        motion_spectrum.save_motion_spectrum(mode_shapes, save_dir, filtered=filtering, masked=masking)
+        save_mode_shape(mode_shapes, save_dir, filtered=filtering, masked=masking)
     
     complex_mode_shapes = motion_spectrum_2_complex(mode_shapes)
     
     if isinstance(complex_mode_shapes, tuple):
         disp = disp.to(complex_mode_shapes[0].device, dtype=complex_mode_shapes[0].dtype)
         for i in range(2):
-            deformation_map, modal_coordinates = displacement.calculate_deformation_map_from_displacement(complex_mode_shapes[i], displacement, pixel)
+            deformation_map, modal_coordinates = deformation.calculate_deformation_map_from_displacement(complex_mode_shapes[i], deformation, pixel)
             deformation_map_img = flow_to_image(deformation_map.unsqueeze(0))
             save_modal_coordinates(modal_coordinates, save_dir, disp, pixel)
             optical_flow.plot_and_save(deformation_map_img, "test/displacement_map_{}.png".format(i))
     else:
         disp = disp.to(complex_mode_shapes.device, dtype=complex_mode_shapes.dtype)
-        deformation_map, modal_coordinates = displacement.calculate_deformation_map_from_displacement(complex_mode_shapes, disp, pixel)
+        deformation_map, modal_coordinates = deformation.calculate_deformation_map_from_displacement(complex_mode_shapes, disp, pixel)
         deformation_map_img = flow_to_image(deformation_map.unsqueeze(0))
         optical_flow.plot_and_save(deformation_map_img, save_dir/"deformation_map.png")
 

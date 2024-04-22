@@ -28,6 +28,10 @@ class TestUtils(unittest.TestCase):
 
         # Clean up the test directory
         shutil.rmtree(save_dir/"modal_coordinates")
+    
+    @classmethod
+    def tearDownClass(cls) -> None:
+        shutil.rmtree(script_dir/"test_data")
 
 if __name__ == "__main__":
     unittest.main()

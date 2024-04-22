@@ -1,11 +1,12 @@
 import pymodal_surgical
-from pymodal_surgical import motion_spectrum, optical_flow, displacement
+from pymodal_surgical import motion_spectrum
 from pathlib import Path, PosixPath
+from pymodal_surgical.modal_analysis import displacement, optical_flow
 from pymodal_surgical.video_processing.reader import VideoReader, RetType
 import json
 from pymodal_surgical.video_processing.masking import Masking
 import torch
-import pymodal_surgical.complex
+import pymodal_surgical.modal_analysis.math_helper
 
 
 
@@ -37,7 +38,7 @@ def main(
         mode_shapes = motion_spectrum.calculate_motion_spectrum(frames, K, filtered=filtering, mask=mask)
         motion_frequencies = optical_flow.get_motion_frequencies(len(frames), K, sampling_period=1/30)
     
-    complex_mode_shapes = pymodal_surgical.complex.motion_spectrum_2_complex(mode_shapes)
+    complex_mode_shapes = pymodal_surgical.math_helper.motion_spectrum_2_complex(mode_shapes)
     
     if isinstance(complex_mode_shapes, tuple):
         target_displacement = target_displacement.to(complex_mode_shapes[0].device, dtype=complex_mode_shapes[0].dtype)
