@@ -1,5 +1,5 @@
 import torch
-from . import modal_analysis, functions
+from . import functions
 
 
 def normalize_deformation_map(displacement_map: torch.Tensor) -> torch.Tensor:
@@ -13,7 +13,7 @@ def calculate_deformation_map_from_modal_coordinate(
     """
     Calculate the deformation map from the mode shape and modal coordinate.
     """
-    
+
     if isinstance(mode_shape, tuple):
         left_mode_shape = mode_shape[0]
         right_mode_shape = mode_shape[1]
@@ -38,7 +38,7 @@ def calculate_deformation_map_from_displacement(
     """
 
     # Calculate the modal coordinate and reshape for multiplication
-    modal_coordinates = modal_analysis.calculate_modal_coordinate(mode_shape, displacement, pixel, alpha)
+    modal_coordinates = functions.calculate_modal_coordinate(mode_shape, displacement, pixel, alpha)
     modal_coordinates = modal_coordinates.unsqueeze(-1).unsqueeze(-1)
     # modal_coordinates = normalize_modal_coordinate(modal_coordinates)
 

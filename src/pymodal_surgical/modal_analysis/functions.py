@@ -1,4 +1,4 @@
-from . import depth, optical_flow, modal_analysis, math_helper
+from . import depth, optical_flow, motion, math_helper
 import torch
 import numpy as np
 from ..video_processing.filtering import GaussianFiltering
@@ -49,12 +49,12 @@ def calculate_mode_shapes(
         depth_flow = depth.z_optical_flow_from_video(depth_maps)
         flows = depth.create_rgbd(flows, depth_flow)
     
-    motion_spectrum = modal_analysis.mode_shapes_from_optical_flow(flows, K, flows.shape[0]).squeeze(0)
+    mode_shapes = motion.mode_shapes_from_optical_flow(flows, K, flows.shape[0]).squeeze(0)
     
     if mask is not None:
-        motion_spectrum = mask(motion_spectrum, camera_pos=camera_pos)
+        mode_shapes = mask(mode_shapes, camera_pos=camera_pos)
         
-    return motion_spectrum.detach().cpu()
+    return mode_shapes.detach().cpu()
 
     
 
@@ -86,8 +86,8 @@ def calculate_modal_coordinate(
         mode_shape = mode_shape.unsqueeze(0)
         
     # Calculate the magnitude of the vector
-    magnitude = modal_analysis.calculate_modal_magnitude(mode_shape, displacement, pixel, alpha)
+    magnitude = motion.calculate_modal_magnitude(mode_shape, displacement, pixel, alpha)
     # Calculate the phase of the vector
-    phase = modal_analysis.calculate_modal_phase(mode_shape, displacement, pixel, maximize)
+    phase = motion.calculate_modal_phase(mode_shape, displacement, pixel, maximize)
     # Convert the magnitude and phase to a complex tensor
     return math_helper.complex_from_magnitude_phase(magnitude, phase)
