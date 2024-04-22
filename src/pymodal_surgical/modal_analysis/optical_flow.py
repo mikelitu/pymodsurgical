@@ -1,28 +1,8 @@
 import torch
-import torchvision
 import torchvision.transforms as T
 from torchvision.models.optical_flow import raft_large, Raft_Large_Weights
-import matplotlib.pyplot as plt
 import numpy as np
-from pathlib import PosixPath
-
-
-def make_grid(img: torch.Tensor, device: torch.device = torch.device("cpu")) -> torch.Tensor:
-    """
-    Create a grid of the same size as the input image.
-
-    Args:
-        img (torch.Tensor): Image tensor of shape (C, H, W) and dtype torch.float.
-
-    Returns:
-        grid (torch.Tensor): Grid tensor of shape (2, H, W) and dtype torch.float.
-    """
-    B, _, H, W = img.shape
-    xx = torch.arange(0, W).view(1, -1).repeat(H, 1).to(device)
-    yy = torch.arange(0, H).view(-1, 1).repeat(1, W).to(device)
-    xx = xx.view(1, 1, H, W).repeat(B, 1, 1, 1)
-    yy = yy.view(1, 1, H, W).repeat(B, 1, 1, 1)
-    return torch.cat((xx, yy), dim=1).float().to(img.device)
+from . import math_helper
 
 
 def warp_flow(
@@ -57,7 +37,7 @@ def warp_flow(
         mask = torch.from_numpy(mask).unsqueeze(0).unsqueeze(0).to(flow.device)
 
     _, _, H, W = img.shape
-    grid = make_grid(img)
+    grid = math_helper.make_grid(img)
     grid = grid + flow
 
     # Apply the masking on the grid
@@ -88,62 +68,6 @@ def warp_flow(
     warped_img = np.clip(warped_img, 0., 1.)
     warped_img = (warped_img * 255).astype(np.uint8)
     return warped_img
-
-
-def plot_and_save(imgs: list[torch.Tensor] | torch.Tensor, filename: PosixPath | None = None, **imshow_kwargs):
-    if not isinstance(imgs, list):
-        imgs = [imgs]
-    
-    num_rows = len(imgs)
-    num_cols = len(imgs[0])
-    _, axs = plt.subplots(nrows=num_rows, ncols=num_cols, figsize=(num_cols * 5, num_rows * 5), squeeze=False)
-
-    for row_idx, row in enumerate(imgs):
-        for col_idx, img in enumerate(row):
-            ax = axs[row_idx][col_idx]
-            img = torchvision.transforms.functional.to_pil_image(img.to("cpu"))
-            ax.imshow(np.asarray(img), **imshow_kwargs)
-            ax.set(xticks=[], yticks=[], xticklabels=[], yticklabels=[])
-    if filename is not None:
-        plt.savefig(filename)
-    else:
-        plt.show()
-
-
-def motion_spectrum_2_grayimage(motion_spectrum: torch.Tensor) -> torch.Tensor:
-    """
-    Converts a motion spectrum to a RGB image.
-
-    Args:
-        motion_texture (torch.Tensor): Spectrum of shape (K, 4, H, W) and dtype torch.float.
-
-    Returns:
-        img (Tensor): Image Tensor of dtype uint8 and shape where each color corresponds to 
-        a given spectrum direction. Shape is (K, 3, H, W).
-    """
-
-    if motion_spectrum.dtype != torch.float:
-        raise ValueError("The motion spectrum should have dtype torch.float")
-    
-    orig_shape = motion_spectrum.shape
-    if motion_spectrum.ndim != 4 or (orig_shape[1] != 4 and orig_shape[1] != 6):
-        raise ValueError("The motion spectrum should have shape (K, 4, H, W) or (K, 6, H, W)")
-    
-    motion_spectrum_X = torch.abs(motion_spectrum[:, 0] + 1j * motion_spectrum[:, 1])
-    motion_spectrum_Y = torch.abs(motion_spectrum[:, 2] + 1j * motion_spectrum[:, 3])
-    if orig_shape[1] == 6:
-        motion_spectrum_Z = torch.abs(motion_spectrum[:, 4] + 1j * motion_spectrum[:, 5])
-        motion_spectrum = torch.stack([motion_spectrum_X, motion_spectrum_Y, motion_spectrum_Z], dim=1)
-    else:
-        motion_spectrum = torch.stack([motion_spectrum_X, motion_spectrum_Y], dim=1)
-    max_norm = torch.sum(motion_spectrum**2, dim=1).sqrt().max()
-    epsilon = torch.finfo(motion_spectrum.dtype).eps
-    motion_spectrum = motion_spectrum / (max_norm + epsilon)
-    # img = _normalized_motion_spectrum_to_image(motion_spectrum)
-    if orig_shape[1] == 6:
-        return motion_spectrum[:, 0], motion_spectrum[:, 1], motion_spectrum[:, 2]
-    
-    return motion_spectrum[:, 0], motion_spectrum[:, 1]
 
 
 def load_flow_model(device: torch.device = torch.device("cuda:0")) -> torch.nn.Module:
@@ -240,36 +164,6 @@ def motion_texture_from_flow_field(
                 motion_texture[:, :, 5, i, j] = (1.0 / K) * Z_f[:, 1:K+1].imag
 
     return motion_texture
-
-
-def flow_field_from_motion_texture(
-    motion_texture: torch.Tensor,
-    timesteps: int,
-    K: int
-) -> torch.Tensor:
-    
-    if len(motion_texture.shape) == 4:
-        motion_texture = motion_texture.view(-1, K, motion_texture.shape[1], motion_texture.shape[2], motion_texture.shape[3])
-
-    batch_size, _, dim, height, width = motion_texture.shape
-    if dim not in [4, 6]:
-        raise ValueError("The dimension of the motion texture must be 4 for 2D tensors or 6 for 3D tensors.")
-    
-    flow_field = torch.zeros((batch_size, timesteps, 2 if dim==4 else 3, height, width)).to(motion_texture.device)
-    for i in range(height):
-        for j in range(width):
-            X_f = motion_texture[:, :, 0, i, j].float() * K + 1j * motion_texture[:, :, 1, i, j].float() * K
-            Y_f = motion_texture[:, :, 2, i, j].float() * K + 1j * motion_texture[:, :, 3, i, j].float() * K
-            x_t = torch.fft.irfft(X_f, timesteps, dim=-1)
-            y_t = torch.fft.irfft(Y_f, timesteps, dim=-1)
-            flow_field[:, :, 0, i, j] = x_t
-            flow_field[:, :, 1, i, j] = y_t
-            if dim==6:
-                Z_f = motion_texture[:, :, 4, i, j].float() * K + 1j * motion_texture[:, :, 5, i, j].float() * K
-                z_t = torch.fft.irfft(Z_f, timesteps, dim=-1)
-                flow_field[:, :, 2, i, j] = z_t
-
-    return flow_field
 
 
 def get_motion_frequencies(

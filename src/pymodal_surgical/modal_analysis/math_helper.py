@@ -58,7 +58,7 @@ def simplify_complex_tensor(complex_tensor: torch.Tensor) -> torch.Tensor:
     return torch.atan2(imag_values, real_values)
 
 
-def motion_spectrum_2_complex(
+def mode_shape_2_complex(
     motion_spectrum: torch.Tensor | tuple[torch.Tensor, torch.Tensor]
 ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
     """
@@ -75,8 +75,8 @@ def motion_spectrum_2_complex(
     if isinstance(motion_spectrum, tuple):
         left_motion_spectrum = motion_spectrum[0]
         right_motion_spectrum = motion_spectrum[1]
-        left_complex_motion_spectrum = motion_spectrum_2_complex(left_motion_spectrum)
-        right_complex_motion_spectrum = motion_spectrum_2_complex(right_motion_spectrum)
+        left_complex_motion_spectrum = mode_shape_2_complex(left_motion_spectrum)
+        right_complex_motion_spectrum = mode_shape_2_complex(right_motion_spectrum)
         return left_complex_motion_spectrum, right_complex_motion_spectrum
     
     
@@ -103,6 +103,7 @@ def normalize_modal_coordinate(
     norm = torch.linalg.norm(modal_coordinate, dim=1, ord=2)
     return modal_coordinate / norm.unsqueeze(-1)
 
+
 def orthonormal_normalization(
     complex_tensor: torch.Tensor
 ) -> torch.Tensor:
@@ -115,104 +116,39 @@ def orthonormal_normalization(
     return complex_tensor / norm
 
 
-def plot_modal_coordinates(
-    modal_coordinates: torch.Tensor | np.ndarray,
-    displacement: torch.Tensor | None = None,
-    pixel: tuple[int, int] | None = None,
-    show: bool = True,
-    save: bool = False,
-    save_dir: str | PosixPath = "./figures"
-) -> None:
+def make_grid(img: torch.Tensor, device: torch.device = torch.device("cpu")) -> torch.Tensor:
     """
-    Plot the modal coordinates.
+    Create a grid of the same size as the input image.
+
+    Args:
+        img (torch.Tensor): Image tensor of shape (C, H, W) and dtype torch.float.
+
+    Returns:
+        grid (torch.Tensor): Grid tensor of shape (2, H, W) and dtype torch.float.
     """
+    B, _, H, W = img.shape
+    xx = torch.arange(0, W).view(1, -1).repeat(H, 1).to(device)
+    yy = torch.arange(0, H).view(-1, 1).repeat(1, W).to(device)
+    xx = xx.view(1, 1, H, W).repeat(B, 1, 1, 1)
+    yy = yy.view(1, 1, H, W).repeat(B, 1, 1, 1)
+    return torch.cat((xx, yy), dim=1).float().to(img.device)
 
-    # Transform the modal coordinates to numpy
-    if isinstance(modal_coordinates, torch.Tensor):
-        modal_coordinates = normalize_modal_coordinate(modal_coordinates)
-        modal_coordinates = modal_coordinates.detach().cpu().numpy()
-    
-    plot_names = ["X", "Y", "Z"]
 
-    # Create the figure
-    fig, axs = plt.subplots(ncols=modal_coordinates.shape[1], figsize=(16, 7))
-    
-    # Setting the properties of the plot
-    for i, ax in enumerate(axs):
-        ax.set_aspect('equal', 'box')
-        ax.set_xlim(-1.5, 1.5)
-        ax.set_ylim(-1.5, 1.5)
-        ax.grid(True)
-        ax.axhline(0, color='black', lw=0.5)
-        ax.axvline(0, color='black', lw=0.5)
-        ax.set_title(f'Modal Coordinates {plot_names[i]}')
-    
-    for mc in modal_coordinates:
-        ax.set_aspect('equal', 'box')
+def _norm_numpy(
+    array: np.ndarray,
+    as_img: bool = False
+) -> np.ndarray:
+    array = (array - array.min()) / (array.max() - array.min())
+    if as_img:
+        array = (255 * array).astype(np.uint8)
+    return array
 
-        # Plot each modal coordinate
-        for i, ax in enumerate(axs):
-            ax.quiver(0, 0, mc[i].real, mc[i].imag, angles='xy', scale_units='xy', scale=1, color='r')
 
-    # Set the title of the plot
-    if modal_coordinates.shape[1] == 2:
-        str_displacement = f"({displacement[0]}_{displacement[1]})"
-    else:
-        str_displacement = f"({displacement[0]}_{displacement[1]}_{displacement[2]})"
-
-    str_pixel = f"({pixel[0]}_{pixel[1]})"
-    title = f"Modal Coordinates for Displacement {str_displacement} and Pixel {str_pixel}"
-    fig.suptitle(title, fontsize=16)
-    fig.supylabel('Imaginary Part')
-    fig.supxlabel('Real Part')
-
-    if save:
-        if isinstance(save_dir, str):
-            save_dir = Path(save_dir)
-        save_dir.mkdir(exist_ok=True, parents=True)
-        filename = save_dir/f"modal_coordinates_{str_displacement}_{str_pixel}.png"
-        fig.tight_layout()
-        fig.savefig(filename, dpi=300)
-        print(f"Modal coordinates saved to: {filename}")
-
-    if show:
-        plt.show()
-    
-
-def save_modal_coordinates(
-    modal_coordinates: torch.Tensor,
-    save_dir: str | PosixPath = "./",
-    displacement: torch.Tensor | None = None,
-    pixel: tuple[int, int] | None = None
+def _norm_torch(
+    tensor: torch.Tensor,
+    as_img: bool = False
 ) -> torch.Tensor:
-    """
-    Save the modal coordinates into a numpy file
-    """
-    if displacement is None:
-        displacement = (0, 0)
-    if pixel is None:
-        pixel = (0, 0)
-
-    modal_coordinates = modal_coordinates.detach().cpu().numpy()
-    
-    if isinstance(save_dir, str):
-        save_dir = Path(save_dir)
-    
-    save_dir = save_dir / "modal_coordinates"
-    save_dir.mkdir(exist_ok=True, parents=True)
-    
-    if displacement.shape[0] == 2:
-        filename = save_dir/f"disp_{round(displacement[0].real.item(), 2)}_{round(displacement[1].real.item(), 2)}_px_{pixel[0]}_{pixel[1]}.npy"
-    else:
-        filename = save_dir/f"disp_{round(displacement[0].real.item(), 2)}_{round(displacement[1].real.item(), 2)}_{round(displacement[2].real.item(), 2)}_px_{pixel[0]}_{pixel[1]}.npy"
-    
-    np.save(filename, modal_coordinates)
-    print(f"Modal coordinates saved to: {filename}")
-
-
-def load_modal_coordinates(
-    path: str
-) -> torch.Tensor:
-    """Load the modal coordinates from a numpy file
-    """
-    return torch.tensor(np.load(path))
+    tensor = (tensor - tensor.min()) / (tensor.max() - tensor.min())
+    if as_img:
+        tensor = (255 * tensor).to(torch.uint8)
+    return tensor   
