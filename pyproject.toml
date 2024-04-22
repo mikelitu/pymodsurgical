@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pymodal_surgical"
+version = "0.1.0"
+description = "A Python package for surgical modal analysis"
+authors = [
+    {name = "Mikel De Iturrate Reyzabal", email = "mikel.de_iturrate_reyzabal@kcl.ac.uk"},
+]
+readme = {file = "README.rst", content-type = "text/x-rst"}
+license = "MIT"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+
+[projects.url]
+Homepage = "https://github.com/mikelitu/surgical-video-modal-analysis"
+

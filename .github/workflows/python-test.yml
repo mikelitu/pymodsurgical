@@ -34,12 +34,18 @@ jobs:
         gdown 'https://drive.google.com/uc?export=download&id=15tKIC0ZC1IZddwhf1VjGTjnKPbact_DI' -O temp.zip
         unzip temp.zip -d videos
         rm temp.zip
-      
+    
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
+        pip install build
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
+    - name: Install python package
+      run: |
+          python -m build
+          pip install dist/*.tar.gz
+    
     - name: Run tests
       run: |
         python -m unittest discover -s tests
