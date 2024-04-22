@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from PIL import Image
 from pymodal_surgical.video_processing.masking import Masking
-from pymodal_surgical import utils
+from pymodal_surgical.utils import create_save_dir
 import shutil
 from pathlib import Path
 
@@ -13,7 +13,7 @@ def create_and_save_mask():
     mask[128:192, 128:192] = 255
     mask_save_dir = script_dir/"mask_test"
     mask_name = "dummy_mask.png"
-    mask_path = utils.create_save_dir(mask_save_dir, mask_name)
+    mask_path = create_save_dir(mask_save_dir, mask_name)
 
     Image.fromarray(mask).save(mask_path)
     return mask_path
