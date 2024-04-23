@@ -1,12 +1,11 @@
 import pygame
 
-from ..modal_analysis import displacement, math_helper, optical_flow
-from ..modal_analysis import functions
-from video_processing.reader import VideoReader, RetType
+from pymodal_surgical.modal_analysis import deformation, math_helper, optical_flow, motion, depth, solver
+from pymodal_surgical.modal_analysis import functions
+from pymodal_surgical.video_processing.reader import VideoReader, RetType
 import torch
-import json
 from pathlib import Path, PosixPath
-from video_processing.masking import Masking
+from pymodal_surgical.video_processing.masking import Masking
 import math
 import numpy as np
 from enum import StrEnum
@@ -20,8 +19,8 @@ except OSError:
     pass
 
 import time
-import pymodal_surgical.modal_analysis.depth as depth
-import pymodal_surgical.modal_analysis.solver as solver
+import argparse
+import json
 
 
 rad = math.pi / 180
@@ -114,7 +113,7 @@ class InteractiveDemo(object):
         self.alpha_limit = alpha_limit
         self.norm_scale = norm_scale
         timesteps = len(frames[0]) if isinstance(frames, tuple) else len(frames)
-        self.frequencies = optical_flow.get_motion_frequencies(timesteps, K, 1 / fps)
+        self.frequencies = motion.get_motion_frequencies(timesteps, K, 1 / fps)
         self.solve = False
         self.fps = fps
         self.solver_time_step = solver_time_step
@@ -276,9 +275,9 @@ class InteractiveDemo(object):
                 self.calc_pixel = self.pixel
 
                 if isinstance(self.mode_shapes, tuple):
-                    self.modal_coordinates = displacement.calculate_modal_coordinate(self.mode_shapes[0], -self.displacement, self.calc_pixel, self.alpha)
+                    self.modal_coordinates = functions.calculate_modal_coordinate(self.mode_shapes[0], -self.displacement, self.calc_pixel, self.alpha)
                 else:
-                    self.modal_coordinates = displacement.calculate_modal_coordinate(self.mode_shapes, -self.displacement, self.calc_pixel, self.alpha)
+                    self.modal_coordinates = functions.calculate_modal_coordinate(self.mode_shapes, -self.displacement, self.calc_pixel, self.alpha)
             
             if event.type == pygame.MOUSEMOTION:
                 if self.on_click:
@@ -326,9 +325,9 @@ class InteractiveDemo(object):
         )
         
         if isinstance(self.mode_shapes, tuple):
-            deformation_map = displacement.calculate_deformation_map_from_modal_coordinate(self.mode_shapes[0], self.modal_coordinates)
+            deformation_map = deformation.calculate_deformation_map_from_modal_coordinate(self.mode_shapes[0], self.modal_coordinates)
         else:
-            deformation_map = displacement.calculate_deformation_map_from_modal_coordinate(self.mode_shapes, self.modal_coordinates)
+            deformation_map = deformation.calculate_deformation_map_from_modal_coordinate(self.mode_shapes, self.modal_coordinates)
 
         return deformation_map
 
@@ -354,9 +353,9 @@ class InteractiveDemo(object):
 
         if self.pixel is not None and self.on_click:
             if isinstance(self.mode_shapes, tuple):
-                deformation_map, _ = displacement.calculate_deformation_map_from_displacement(self.mode_shapes[0], -self.displacement, self.pixel, self.alpha)
+                deformation_map, _ = deformation.calculate_deformation_map_from_displacement(self.mode_shapes[0], -self.displacement, self.pixel, self.alpha)
             else:
-                deformation_map, _ = displacement.calculate_deformation_map_from_displacement(self.mode_shapes, -self.displacement, self.pixel, self.alpha)
+                deformation_map, _ = deformation.calculate_deformation_map_from_displacement(self.mode_shapes, -self.displacement, self.pixel, self.alpha)
             
             deformed_frame = optical_flow.warp_flow(torch.from_numpy(self.reference_frame).permute(2, 0, 1).float().to(device), deformation_map.to(device), self.depth_map, self.mask, self.near, self.far, self.inverse)
             deformed_frame = self._crop_image_for_display(deformed_frame, (self.reference_frame.shape[0] - self.display_cropping[0], self.reference_frame.shape[1] - self.display_cropping[1]))
@@ -429,7 +428,7 @@ class InteractiveDemo(object):
         masking: bool
     ) -> None:
         """
-        Get the motion spectrum from the video frames.
+        Get the mode shapesfrom the video frames.
         """
         if masking:
             mask = self._init_masking()
@@ -438,12 +437,12 @@ class InteractiveDemo(object):
             mask = None
             self.mask = None
         if isinstance(frames, tuple):
-            mode_shapes = (functions.calculate_motion_spectrum(frames[0], K, filtered=filtering, mask=mask, camera_pos="left", save_flow_video=False), functions.calculate_motion_spectrum(frames[1], K, filtered=filtering, mask=mask, camera_pos="right"))
+            mode_shapes = (functions.calculate_mode_shapes(frames[0], K, filtered=filtering, mask=mask, camera_pos="left", save_flow_video=False), functions.calculate_mode_shapes(frames[1], K, filtered=filtering, mask=mask, camera_pos="right"))
             mode_shapes = functions.resize_spectrum_2_reference(mode_shapes, self.reference_frame)
-            self.mode_shapes, _ = math_helper.motion_spectrum_2_complex(mode_shapes)
+            self.mode_shapes, _ = math_helper.mode_shape_2_complex(mode_shapes)
         else:
-            mode_shapes = functions.calculate_motion_spectrum(frames, K, filtered=filtering, mask=mask)
-            self.mode_shapes = math_helper.motion_spectrum_2_complex(functions.resize_spectrum_2_reference(mode_shapes, self.reference_frame)) 
+            mode_shapes = functions.calculate_mode_shapes(frames, K, filtered=filtering, mask=mask)
+            self.mode_shapes = math_helper.mode_shape_2_complex(functions.resize_spectrum_2_reference(mode_shapes, self.reference_frame)) 
     
 
     def _crop_image_for_display(
