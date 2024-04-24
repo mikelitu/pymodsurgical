@@ -45,11 +45,11 @@ class ConfigWindow(QDialog):
 
         self.label_gaussian_size = QLabel("Gaussian filter size: ")
         self.gaussian_filter_size_input = QLineEdit()
-        self.gaussian_filter_size_input.returnPressed.connect(lambda: self.on_input_returned(self.gaussian_filter_size_input))
+        self.gaussian_filter_size_input.returnPressed.connect(lambda: self.on_input_returned(self.gaussian_filter_size_input, "size"))
 
         self.label_gaussian_sigma = QLabel("Gaussian filter sigma: ")
         self.gaussian_filter_sigma_input = QLineEdit()
-        self.gaussian_filter_sigma_input.returnPressed.connect(lambda: self.on_input_returned(self.gaussian_filter_sigma_input))
+        self.gaussian_filter_sigma_input.returnPressed.connect(lambda: self.on_input_returned(self.gaussian_filter_sigma_input, "sigma"))
 
         self.layout.addWidget(self.label_gaussian_size)
         self.layout.addWidget(self.gaussian_filter_size_input)
@@ -68,25 +68,30 @@ class ConfigWindow(QDialog):
 
         self.file_button = QPushButton("Browse")
         self.file_button.clicked.connect(self.open)
-        self.file_label = QLabel("")
         self.layout.addWidget(self.file_button)
-        self.layout.addWidget(self.file_label)
         self.file_button.setVisible(False)
-        self.file_label.setVisible(False)
 
-        self.config = {"filtering": {"enabled": False, "size": (11, 11), "sigma": (3.0, 3.0)}, 
+        self.config = {"filtering": {"enabled": False, "size": (11, 11), "sigma": 3.0}, 
                        "masking": {"enabled": False, "mask": ""}}
         
-        config_label = QLabel("Gaussian filter size: ({}, {}) \nGaussian filter sigma: ({}, {})".format(11, 11, 3.0, 3.0))
-        self.layout.addWidget(config_label)
+        self.config_label = QLabel(self.create_config_label())
+        self.layout.addWidget(self.config_label)
 
         run_button = QPushButton("Run")
         run_button.clicked.connect(self.run_analysis)
         self.layout.addWidget(run_button)
 
+    def create_config_label(self):
+        config_text = """Filtering: {}\n\tGaussian filter size: ({}, {}) \n\tGaussian filter sigma: {}\nMasking: {}\n\tMask: {}""".format(
+            self.config["filtering"]["enabled"], self.config["filtering"]["size"][0], self.config["filtering"]["size"][1], self.config["filtering"]["sigma"],
+            self.config["masking"]["enabled"], os.path.basename(self.config["masking"]["mask"]) if self.config["masking"]["mask"] else "None"
+        )
+        return config_text
+    
+    
     def run_analysis(self):
         self.close()
-    
+
     def filter_state_changed(self, state):
 
         if state == 2:
@@ -94,16 +99,42 @@ class ConfigWindow(QDialog):
             self.label_gaussian_size.setVisible(True)
             self.gaussian_filter_sigma_input.setVisible(True)
             self.gaussian_filter_size_input.setVisible(True)
+            self.config["filtering"]["enabled"] = True
+            self.config_label.setText(self.create_config_label())
         else:
             self.label_gaussian_size.setVisible(False)
             self.label_gaussian_sigma.setVisible(False)
             self.gaussian_filter_size_input.setVisible(False)
             self.gaussian_filter_sigma_input.setVisible(False)
+            self.config["filtering"]["enabled"] = False
+            self.config_label.setText(self.create_config_label())
     
-    def on_input_returned(self, input_field: QLineEdit):
+    def on_input_returned(self, input_field: QLineEdit, tag: str = None):
         user_input = input_field.text()
-        print(user_input)
-        input_field.clear()
+        if self.check_valid_input(user_input, tag):
+            input_field.clear()
+            if tag == "size":
+                self.config["filtering"][tag] = (int(user_input), int(user_input))
+            elif tag == "sigma":
+                self.config["filtering"][tag] = float(user_input)
+            
+            self.config_label.setText(self.create_config_label())
+
+    def check_valid_input(self, user_input: str, tag: str):
+        try:
+            if tag == "size":
+                size = int(user_input)
+                if size % 2 == 0:
+                    raise ValueError("Size must be an odd number")
+            elif tag == "sigma":
+                sigma = float(user_input)
+                if sigma < 0:
+                    raise ValueError("Sigma must be a positive number")
+        except ValueError as e:
+            print(e)
+            return False
+        return True
+    
 
     def open(self):
         file_dialog = QFileDialog(self)
@@ -112,21 +143,18 @@ class ConfigWindow(QDialog):
         if file_dialog.exec() == QDialog.DialogCode.Accepted:
             url = file_dialog.selectedUrls()[0]
             self.config["masking"]["mask"] = url.toLocalFile()
-            print(self.config["masking"]["mask"])
             filename = os.path.basename(url.toLocalFile())
-            self.file_label.setText(filename)
-            self.file_label.setVisible(True)
+            self.config_label.setText(self.create_config_label())
 
     def masking_state_changed(self, state):
         if state == 2:
             self.file_button.setVisible(True)
-            self.file_label.setVisible(True)
             self.config["masking"]["enabled"] = True
+            self.config_label.setText(self.create_config_label())
         else:
             self.config["masking"]["enabled"] = False
             self.file_button.setVisible(False)
-            self.file_label.setVisible(False)
-            pass
+            self.config_label.setText(self.create_config_label())
 
 
     def show(self):
