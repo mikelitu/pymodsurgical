@@ -1,18 +1,19 @@
 import sys
-from PySide6.QtCore import QStandardPaths, Qt, Slot
-from PySide6.QtGui import QAction, QIcon, QKeySequence
+from PySide6.QtCore import QStandardPaths, Qt, Slot, QUrl
+from PySide6.QtGui import QAction, QIcon, QKeySequence, QImageReader
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog,
-                               QMainWindow, QSlider, QStyle, QToolBar, QVBoxLayout, QWidget)
+                               QMainWindow, QSlider, QStyle, QToolBar, QVBoxLayout, QWidget, QLabel, QCheckBox,
+                               QInputDialog, QLineEdit, QPushButton, QMessageBox)
 from PySide6.QtMultimedia import (QAudioOutput, QMediaFormat,
                                   QMediaPlayer)
 from PySide6.QtMultimediaWidgets import QVideoWidget
 import os
+import cv2
 
 
 AVI = "video/x-msvideo"  # AVI
 MP4 = 'video/mp4'
 
-os.environ["QT_DEBUG_PLUGINS"] = "1"
 
 def get_supported_mime_types():
     result = []
@@ -21,6 +22,117 @@ def get_supported_mime_types():
         result.append(mime_type.name())
     return result
 
+def get_supported_image_formats():
+    result = []
+    for f in QImageReader().supportedImageFormats():
+        image_format = f.toStdString()
+        result.append(image_format)
+        # result.append(mime_type.name())
+    return result
+
+class ConfigWindow(QDialog):
+    def __init__(self, parent: QMainWindow | None = None):
+        super().__init__(parent)
+
+        video_url: QUrl = parent._player.source()
+        video_path = video_url.toLocalFile()
+        print(video_path)
+        self.setWindowTitle("Configuration")
+        self.layout = QVBoxLayout()
+        self.setLayout(self.layout)
+        self.filter_check_box = QCheckBox("Filter")
+        self.layout.addWidget(self.filter_check_box)
+
+        self.label_gaussian_size = QLabel("Gaussian filter size: ")
+        self.gaussian_filter_size_input = QLineEdit()
+        self.gaussian_filter_size_input.returnPressed.connect(lambda: self.on_input_returned(self.gaussian_filter_size_input))
+
+        self.label_gaussian_sigma = QLabel("Gaussian filter sigma: ")
+        self.gaussian_filter_sigma_input = QLineEdit()
+        self.gaussian_filter_sigma_input.returnPressed.connect(lambda: self.on_input_returned(self.gaussian_filter_sigma_input))
+
+        self.layout.addWidget(self.label_gaussian_size)
+        self.layout.addWidget(self.gaussian_filter_size_input)
+        self.layout.addWidget(self.label_gaussian_sigma)
+        self.layout.addWidget(self.gaussian_filter_sigma_input)
+
+        self.label_gaussian_size.setVisible(False)
+        self.label_gaussian_sigma.setVisible(False)
+        self.gaussian_filter_size_input.setVisible(False)
+        self.gaussian_filter_sigma_input.setVisible(False)
+
+        self.masking_check_box = QCheckBox("Masking")
+        self.layout.addWidget(self.masking_check_box)
+        self.filter_check_box.stateChanged.connect(self.filter_state_changed)
+        self.masking_check_box.stateChanged.connect(self.masking_state_changed)
+
+        self.file_button = QPushButton("Browse")
+        self.file_button.clicked.connect(self.open)
+        self.file_label = QLabel("")
+        self.layout.addWidget(self.file_button)
+        self.layout.addWidget(self.file_label)
+        self.file_button.setVisible(False)
+        self.file_label.setVisible(False)
+
+        self.config = {"filtering": {"enabled": False, "size": (11, 11), "sigma": (3.0, 3.0)}, 
+                       "masking": {"enabled": False, "mask": ""}}
+        
+        config_label = QLabel("Gaussian filter size: ({}, {}) \nGaussian filter sigma: ({}, {})".format(11, 11, 3.0, 3.0))
+        self.layout.addWidget(config_label)
+
+        run_button = QPushButton("Run")
+        run_button.clicked.connect(self.run_analysis)
+        self.layout.addWidget(run_button)
+
+    def run_analysis(self):
+        self.close()
+    
+    def filter_state_changed(self, state):
+
+        if state == 2:
+            self.label_gaussian_sigma.setVisible(True)
+            self.label_gaussian_size.setVisible(True)
+            self.gaussian_filter_sigma_input.setVisible(True)
+            self.gaussian_filter_size_input.setVisible(True)
+        else:
+            self.label_gaussian_size.setVisible(False)
+            self.label_gaussian_sigma.setVisible(False)
+            self.gaussian_filter_size_input.setVisible(False)
+            self.gaussian_filter_sigma_input.setVisible(False)
+    
+    def on_input_returned(self, input_field: QLineEdit):
+        user_input = input_field.text()
+        print(user_input)
+        input_field.clear()
+
+    def open(self):
+        file_dialog = QFileDialog(self)
+        file_dialog.setMimeTypeFilters(get_supported_image_formats())
+        file_dialog.setDirectory(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.PicturesLocation))
+        if file_dialog.exec() == QDialog.DialogCode.Accepted:
+            url = file_dialog.selectedUrls()[0]
+            self.config["masking"]["mask"] = url.toLocalFile()
+            print(self.config["masking"]["mask"])
+            filename = os.path.basename(url.toLocalFile())
+            self.file_label.setText(filename)
+            self.file_label.setVisible(True)
+
+    def masking_state_changed(self, state):
+        if state == 2:
+            self.file_button.setVisible(True)
+            self.file_label.setVisible(True)
+            self.config["masking"]["enabled"] = True
+        else:
+            self.config["masking"]["enabled"] = False
+            self.file_button.setVisible(False)
+            self.file_label.setVisible(False)
+            pass
+
+
+    def show(self):
+        super().show()
+        self.exec()
+        
 
 class MainWindow(QMainWindow):
 
@@ -31,6 +143,7 @@ class MainWindow(QMainWindow):
         self._playlist_index = -1
         self._audio_output = QAudioOutput()
         self._player = QMediaPlayer()
+        self.config_window = None
         self._player.setAudioOutput(self._audio_output)
 
         self._player.errorOccurred.connect(self._player_error)
@@ -50,8 +163,26 @@ class MainWindow(QMainWindow):
                               shortcut="Ctrl+Q", triggered=self.close)
         file_menu.addAction(exit_action)
 
-        play_menu = self.menuBar().addMenu("&Play")
         style = self.style()
+
+        self.analyse_menu = self.menuBar().addMenu("&Analyse")
+        icon = QIcon.fromTheme("compute",
+                               style.standardIcon(QStyle.StandardPixmap.SP_ComputerIcon))
+        compute_action = QAction(icon, "&Start", self, 
+                                 shortcut="Ctrl+A", triggered=self.open_config)
+        
+        flow_action = QAction(icon, "&Flow", self,
+                              shortcut="Ctrl+F", triggered=self.open_config)
+        
+        self.analyse_menu.addAction(compute_action)
+        tool_bar.addAction(compute_action)
+        self.analyse_menu.addAction(flow_action)
+        self.analyse_menu.setVisible(False)
+
+        icon = QIcon.fromTheme("media-seek-backward")
+
+        play_menu = self.menuBar().addMenu("&Play")
+        
         
         icon = QIcon.fromTheme("media-playback-start",
                                style.standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
@@ -83,27 +214,8 @@ class MainWindow(QMainWindow):
         self._stop_action.triggered.connect(self._ensure_stopped)
         play_menu.addAction(self._stop_action)
 
-        self._volume_slider = QSlider()
-        self._volume_slider.setOrientation(Qt.Orientation.Horizontal)
-        self._volume_slider.setMinimum(0)
-        self._volume_slider.setMaximum(100)
-        available_width = self.screen().availableGeometry().width()
-        self._volume_slider.setFixedWidth(available_width / 10)
-        self._volume_slider.setValue(self._audio_output.volume())
-        self._volume_slider.setTickInterval(10)
-        self._volume_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
-        self._volume_slider.setToolTip("Volume")
-        self._volume_slider.valueChanged.connect(self._audio_output.setVolume)
-        tool_bar.addWidget(self._volume_slider)
-
-        
-
-        # icon = QIcon.fromTheme("help-about")
-        # about_menu = self.menuBar().addMenu("&About")
-        # about_qt_act = QAction(icon, "About &Qt", self, triggered=)  # noqa: F821
-        # about_menu.addAction(about_qt_act)
-
-        # video_layout = QVBoxLayout()
+        # compute_action.setVisible(False)
+        # flow_action.setVisible(False)
 
         self.main_layout = QVBoxLayout()
         self._video_widget = QVideoWidget()
@@ -155,24 +267,60 @@ class MainWindow(QMainWindow):
             self._playlist.append(url)
             self._playlist_index = len(self._playlist) - 1
             self._player.setSource(url)
-            print(self._player.duration())
-            self._player.play()
+            self._metadata = self._get_video_stats(url.toLocalFile())
+            self._player.pause()
 
             # Create a frame slider for the new media
-            if self._player.duration() > 0:
+            if self._metadata["duration"] > 0:
                  # layout.addLayout(video_layout)
-                print("Duration: ", self._player.duration() // 1000)
                 self._frame_slider = QSlider()
                 self._frame_slider.setOrientation(Qt.Orientation.Horizontal)
                 self._frame_slider.setMinimum(0)
-                self._frame_slider.setMaximum(self._player.duration() // 1000)
+                self._frame_slider.setMaximum(self._metadata["duration"] // 1000)
                 self._frame_slider.setFixedWidth(self.screen().availableGeometry().width() / 3)
                 self._frame_slider.setToolTip("Position")
-                self._frame_slider.sliderMoved.connect(self._player.setPosition)
+                self._frame_slider.valueChanged.connect(self.on_frame_slider_value_changed)
                 self.main_layout.addWidget(self._frame_slider)
+                self.analyse_menu.setVisible(True)
+                self._player.positionChanged.connect(self.on_media_state_changed)
             # self._frame_slider.setValue(0)
             # self._frame_slider.setMaximum(self._player.duration() // 1000)
 
+    def on_media_state_changed(self, state):
+            self._frame_slider.setSliderPosition(self._player.position() // 1000)
+
+    def open_config(self):
+        if self._player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+            self._player.pause()
+        
+        if self._player.source().isEmpty():
+            advise_window = QMessageBox(self)
+            advise_window.setText("No video loaded. Please, load a video first.")
+            advise_window.exec()
+            return
+        
+        if self.config_window is None:
+            self.config_window = ConfigWindow(self)
+        
+        self.config_window.show()
+
+    def _get_video_stats(self, video_path):
+        try:
+            cap = cv2.VideoCapture(video_path)
+        except cv2.error as e:
+            print(f"Error opening video file: {e}")
+            return None
+        
+        metadata = {}
+        if not cap.isOpened():
+            return None
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        duration = int(frame_count / fps) * 1000 # QMediaPlayer measures the duration in milliseconds
+        cap.release()
+        metadata = {"fps": fps, "duration": duration}
+        return metadata
+    
     @Slot()
     def _ensure_stopped(self):
         if self._player.playbackState() != QMediaPlayer.PlaybackState.StoppedState:
@@ -194,6 +342,7 @@ class MainWindow(QMainWindow):
         if self._playlist_index < len(self._playlist) - 1:
             self._playlist_index += 1
             self._player.setSource(self._playlist[self._playlist_index])
+
 
     @Slot("QMediaPlayer::PlaybackState")
     def update_buttons(self, state):
