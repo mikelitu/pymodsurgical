@@ -3,7 +3,7 @@ from PySide6.QtCore import QStandardPaths, Qt, Slot, QUrl
 from PySide6.QtGui import QAction, QIcon, QKeySequence, QImageReader
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog,
                                QMainWindow, QSlider, QStyle, QToolBar, QVBoxLayout, QWidget, QLabel, QCheckBox,
-                               QInputDialog, QLineEdit, QPushButton, QMessageBox)
+                               QInputDialog, QLineEdit, QPushButton, QMessageBox, QSpinBox, QDoubleSpinBox)
 from PySide6.QtMultimedia import (QAudioOutput, QMediaFormat,
                                   QMediaPlayer)
 from PySide6.QtMultimediaWidgets import QVideoWidget
@@ -36,20 +36,50 @@ class ConfigWindow(QDialog):
 
         video_url: QUrl = parent._player.source()
         video_path = video_url.toLocalFile()
-        print(video_path)
+        video_data = parent._metadata
         self.setWindowTitle("Configuration")
+
+
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
+
+        start_input = QSpinBox()
+        start_input.setRange(0, video_data["duration"] // 1000 * video_data["fps"])
+        start_input.setSingleStep(1)
+        start_input.setValue(0)
+        start_input.setFixedWidth(self.screen().availableGeometry().width() / 10)
+        start_input.valueChanged.connect(lambda: self.on_input_returned(start_input, "start"))
+        self.layout.addWidget(QLabel("Start frame: "))
+        self.layout.addWidget(start_input)
+
+        end_input = QSpinBox()
+        end_input.setRange(0, video_data["duration"] // 1000 * video_data["fps"])
+        end_input.setSingleStep(1)
+        end_input.setValue(video_data["duration"] // 1000 * video_data["fps"])
+        end_input.setFixedWidth(self.screen().availableGeometry().width() / 10)
+        end_input.valueChanged.connect(lambda: self.on_input_returned(end_input, "end"))
+        self.layout.addWidget(QLabel("End frame: "))
+        self.layout.addWidget(end_input)
+
         self.filter_check_box = QCheckBox("Filter")
         self.layout.addWidget(self.filter_check_box)
 
         self.label_gaussian_size = QLabel("Gaussian filter size: ")
-        self.gaussian_filter_size_input = QLineEdit()
-        self.gaussian_filter_size_input.returnPressed.connect(lambda: self.on_input_returned(self.gaussian_filter_size_input, "size"))
+        self.gaussian_filter_size_input = QSpinBox()
+        self.gaussian_filter_size_input.setRange(3, 21)
+        self.gaussian_filter_size_input.setSingleStep(2)
+        self.gaussian_filter_size_input.setValue(11)
+        self.gaussian_filter_size_input.setFixedWidth(self.screen().availableGeometry().width() / 10)
+        self.gaussian_filter_size_input.valueChanged.connect(lambda: self.on_input_returned(self.gaussian_filter_size_input, "size"))
+       
 
         self.label_gaussian_sigma = QLabel("Gaussian filter sigma: ")
-        self.gaussian_filter_sigma_input = QLineEdit()
-        self.gaussian_filter_sigma_input.returnPressed.connect(lambda: self.on_input_returned(self.gaussian_filter_sigma_input, "sigma"))
+        self.gaussian_filter_sigma_input = QDoubleSpinBox()
+        self.gaussian_filter_sigma_input.setRange(0.2, 10.0)
+        self.gaussian_filter_sigma_input.setSingleStep(0.2)
+        self.gaussian_filter_sigma_input.setValue(3.0)
+        self.gaussian_filter_sigma_input.setFixedWidth(self.screen().availableGeometry().width() / 10)
+        self.gaussian_filter_sigma_input.valueChanged.connect(lambda: self.on_input_returned(self.gaussian_filter_sigma_input, "sigma"))
 
         self.layout.addWidget(self.label_gaussian_size)
         self.layout.addWidget(self.gaussian_filter_size_input)
@@ -71,8 +101,10 @@ class ConfigWindow(QDialog):
         self.layout.addWidget(self.file_button)
         self.file_button.setVisible(False)
 
-        self.config = {"filtering": {"enabled": False, "size": (11, 11), "sigma": 3.0}, 
-                       "masking": {"enabled": False, "mask": ""}}
+        self.config = {"start": 0, "end": video_data["duration"] // 1000 * video_data["fps"],
+            "filtering": {"enabled": False, "size": (11, 11), "sigma": 3.0}, 
+            "masking": {"enabled": False, "mask": ""}
+        }
         
         self.config_label = QLabel(self.create_config_label())
         self.layout.addWidget(self.config_label)
@@ -82,15 +114,37 @@ class ConfigWindow(QDialog):
         self.layout.addWidget(run_button)
 
     def create_config_label(self):
-        config_text = """Filtering: {}\n\tGaussian filter size: ({}, {}) \n\tGaussian filter sigma: {}\nMasking: {}\n\tMask: {}""".format(
-            self.config["filtering"]["enabled"], self.config["filtering"]["size"][0], self.config["filtering"]["size"][1], self.config["filtering"]["sigma"],
-            self.config["masking"]["enabled"], os.path.basename(self.config["masking"]["mask"]) if self.config["masking"]["mask"] else "None"
+        range_text = "Start: {} \nEnd: {}".format(self.config["start"], self.config["end"])
+        filter_text = "Filtering:\n\tSize: ({}, {}) \n\tSigma: {}".format(
+            self.config["filtering"]["size"][0], self.config["filtering"]["size"][1], self.config["filtering"]["sigma"]
         )
+        mask_text = "Masking:\n\tMask: {}".format(os.path.basename(self.config["masking"]["mask"]) if self.config["masking"]["mask"] else "None")
+
+        config_text = "{}\n{}\n{}".format(
+            range_text,
+            filter_text if self.config["filtering"]["enabled"] else "", 
+            mask_text if self.config["masking"]["enabled"] else ""
+        )
+
+        # config_text = """Filtering: {}\n\tGaussian filter size: ({}, {}) \n\tGaussian filter sigma: {}\nMasking: {}\n\tMask: {}""".format(
+        #     self.config["filtering"]["enabled"], self.config["filtering"]["size"][0], self.config["filtering"]["size"][1], self.config["filtering"]["sigma"],
+        #     self.config["masking"]["enabled"], os.path.basename(self.config["masking"]["mask"]) if self.config["masking"]["mask"] else "None"
+        # )
         return config_text
     
     
     def run_analysis(self):
-        self.close()
+        ensure_dialog = QMessageBox(self)
+        ensure_dialog.setText("Analysis will start with the following configuration: \n{}".format(self.create_config_label()))
+        ensure_dialog.setStandardButtons(QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel)
+        ensure_dialog.setDefaultButton(QMessageBox.StandardButton.Ok)
+        result = ensure_dialog.exec()
+        if result == QMessageBox.StandardButton.Ok:
+            self.close()
+            self.parent().close()
+        else:
+            ensure_dialog.close()
+            return
 
     def filter_state_changed(self, state):
 
@@ -111,29 +165,14 @@ class ConfigWindow(QDialog):
     
     def on_input_returned(self, input_field: QLineEdit, tag: str = None):
         user_input = input_field.text()
-        if self.check_valid_input(user_input, tag):
-            input_field.clear()
-            if tag == "size":
-                self.config["filtering"][tag] = (int(user_input), int(user_input))
-            elif tag == "sigma":
-                self.config["filtering"][tag] = float(user_input)
+        if tag == "size":
+            self.config["filtering"][tag] = (int(user_input), int(user_input))
+        elif tag == "sigma":
+            self.config["filtering"][tag] = float(user_input)
+        else:
+            self.config[tag] = int(user_input) 
             
-            self.config_label.setText(self.create_config_label())
-
-    def check_valid_input(self, user_input: str, tag: str):
-        try:
-            if tag == "size":
-                size = int(user_input)
-                if size % 2 == 0:
-                    raise ValueError("Size must be an odd number")
-            elif tag == "sigma":
-                sigma = float(user_input)
-                if sigma < 0:
-                    raise ValueError("Sigma must be a positive number")
-        except ValueError as e:
-            print(e)
-            return False
-        return True
+        self.config_label.setText(self.create_config_label())
     
 
     def open(self):
