@@ -27,14 +27,14 @@ jobs:
     
     - name: Install gdown
       run: |
-        pip install gdown
+        pip install gdown build
     
     - name: Download videos
       run: |
         gdown 'https://drive.google.com/uc?export=download&id=15tKIC0ZC1IZddwhf1VjGTjnKPbact_DI' -O temp.zip
         unzip temp.zip -d videos
         rm temp.zip
-
+      
     - name: Install python package
       run: |
           python -m build
