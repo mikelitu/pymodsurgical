@@ -56,8 +56,6 @@ dependencies = [
     "pygame==2.5.2",
     "pyparsing==3.1.1",
     "pyproject_hooks==1.0.0",
-    "pyrealsense2==2.55.1.6486",
-    "pyserial==3.5",
     "PySide6==6.6.3",
     "PySide6_Addons==6.6.3",
     "PySide6_Essentials==6.6.3",
