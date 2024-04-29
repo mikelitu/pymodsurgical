@@ -78,18 +78,17 @@ dependencies = [
     "typing_extensions==4.10.0",
     "urllib3==2.2.1",
     "zope.interface==6.3",
+    "argparse",
 ]
 
 [project.optional-dependencies]
-haptic = [
-    "pyOpenHaptics==1.0.0"
-]
 
 apps = [
     "PySide6==6.6.3",
     "PySide6_Addons==6.6.3",
     "PySide6_Essentials==6.6.3",
     "pygame==2.5.2",
+    "pyOpenHaptics==1.0.0",
 ]
 
 [projects.url]
