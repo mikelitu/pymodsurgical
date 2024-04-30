@@ -71,8 +71,7 @@ def calculate_mode_shapes(
     if mask is not None:
         mode_shapes = mask(mode_shapes, camera_pos=camera_pos)
         
-    return mode_shapes.detach().cpu()
-
+    return mode_shapes.detach().cpu(), flows.detach().cpu()
     
 
 def resize_spectrum_2_reference(

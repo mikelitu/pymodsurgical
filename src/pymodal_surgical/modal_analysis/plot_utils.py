@@ -167,3 +167,26 @@ def save_mode_shape(
         else:
             img_motion_spectrum_X, img_motion_spectrum_Y, img_motion_spectrum_Z = mode_shape_2_grayimage(motion_spectrum)
             plot_and_save([img_motion_spectrum_X, img_motion_spectrum_Y, img_motion_spectrum_Z], save_dir, cmap="plasma")
+
+
+def save_complex_mode_shape(
+    mode_shapes: torch.Tensor | tuple[torch.Tensor, torch.Tensor],
+    save_dir: PosixPath | str
+) -> None:
+
+    if isinstance(mode_shapes, tuple):
+        filenames = {0: "left_complex_motion_spectrum.png", 1: "right_complex_motion_spectrum.png"}
+        for i in range(mode_shapes[0].shape[0]):
+            filename = filenames[i]
+            tmp_save_dir = utils.create_save_dir(save_dir, filename)
+            print(f"Saving complex motion spectrum to: {tmp_save_dir}")
+            plot_and_save(mode_shapes[i], tmp_save_dir, cmap="plasma")
+    else:
+        for i in range(mode_shapes.shape[0]):
+            mode_shape = mode_shapes[i]
+            filename = f"mode_{i}.png"
+            tmp_save_dir = utils.create_save_dir(save_dir, filename)
+            np_mode_shape = mode_shape.detach().cpu().permute(1, 2, 0).numpy()
+            img_mode_shape = Image.fromarray(np_mode_shape, "RGBA")
+            img_mode_shape.save(tmp_save_dir)
+

@@ -69,6 +69,3 @@ def calculate_deformation_map_from_displacement(
     # Calculate the deformation map by weighting the mode shape by the modal coordinate
     deformation_maps = (mode_shape * modal_coordinates).real.sum(dim=0)
     return deformation_maps, modal_coordinates
-
-
-

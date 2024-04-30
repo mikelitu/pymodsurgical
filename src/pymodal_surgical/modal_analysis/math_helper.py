@@ -113,7 +113,7 @@ def orthonormal_normalization(
     shape = complex_tensor.shape
     shape_range = tuple(range(1, len(shape)))
     norm = torch.linalg.vector_norm(complex_tensor, dim=shape_range, keepdim=True)
-    return complex_tensor / norm
+    return complex_tensor / (norm + torch.finfo(complex_tensor.dtype).eps)
 
 
 def make_grid(img: torch.Tensor, device: torch.device = torch.device("cpu")) -> torch.Tensor:

@@ -64,6 +64,7 @@ def calculate_force_from_displacement_map(
     modal_coordinate = modal_coordinate.reshape(-1, 2, 1)
 
     displacement_vector = displacement_map[:, *pixel].unsqueeze(-1)
+
     force_sign = torch.sign(displacement_vector).squeeze(-1)
     pixel_mode_shape = mode_shape[:, :, *pixel].unsqueeze(-1)
     trans_pixel_mode_shape = pixel_mode_shape.transpose(1, 2)
