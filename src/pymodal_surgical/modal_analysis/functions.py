@@ -13,11 +13,27 @@ def calculate_mode_shapes(
     K: int,
     depth_maps: list[np.ndarray] | None = None,
     batch_size: int = 500, 
-    filtered: bool = True,
+    filter_config: dict | None = None,
     mask: Masking | None = None,
     camera_pos: str | None = None,
     save_flow_video: bool = False,
 ) -> torch.Tensor:
+    """
+    Calculates the mode shapes from the given frames using optical flow.
+
+    Args:
+        frames (list[np.ndarray]): List of frames as numpy arrays.
+        K (int): Number of mode shapes to calculate.
+        depth_maps (list[np.ndarray] | None, optional): List of depth maps as numpy arrays. Defaults to None.
+        batch_size (int, optional): Batch size for estimating optical flow. Defaults to 500.
+        filter_config (dict | None, optional): Configuration for Gaussian filtering. Defaults to None.
+        mask (Masking | None, optional): Masking object for applying masks to mode shapes. Defaults to None.
+        camera_pos (str | None, optional): Camera position information. Defaults to None.
+        save_flow_video (bool, optional): Flag to save the optical flow video. Defaults to False.
+
+    Returns:
+        torch.Tensor: Tensor containing the calculated mode shapes.
+    """
     
     preprocess_frames = [optical_flow.preprocess_for_raft(frame) for frame in frames]
     preprocess_frames = torch.stack(preprocess_frames).to(device)
@@ -37,9 +53,10 @@ def calculate_mode_shapes(
     else:
         flows = optical_flow.estimate_flow(model, reference_frames, target_frames).squeeze(0)
 
-    if filtered:
-        filtering = GaussianFiltering((11, 11), 3.0)
-        flows = filtering(target_frames, flows)
+    if filter_config is not None:
+        if filter_config["enabled"]:
+            filtering = GaussianFiltering(filter_config["size"], filter_config["sigma"])
+            flows = filtering(target_frames, flows)
 
     if save_flow_video:
         video_writer = VideoWriter("flows.mp4", {"video_type": "mono", "fps": 30})
@@ -62,9 +79,24 @@ def resize_spectrum_2_reference(
     motion_spectrum: torch.Tensor | tuple[torch.Tensor, torch.Tensor],
     reference_frame: np.ndarray
 ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
+    """
+    Resizes the motion spectrum to match the size of the reference frame.
+
+    Args:
+        motion_spectrum (torch.Tensor | tuple[torch.Tensor, torch.Tensor]): The motion spectrum to be resized.
+            If a tuple is provided, it is assumed to contain two tensors representing the motion spectrum in the x and y directions.
+        reference_frame (np.ndarray): The reference frame used to determine the desired size of the motion spectrum.
+
+    Returns:
+        torch.Tensor | tuple[torch.Tensor, torch.Tensor]: The resized motion spectrum.
+            If a tuple was provided as input, a tuple will be returned with the resized tensors for the x and y directions.
+    """
     
     if isinstance(motion_spectrum, tuple):
-        motion_spectrum = (torch.nn.functional.interpolate(motion_spectrum[0], size=(reference_frame.shape[0], reference_frame.shape[1]), mode="bilinear"), torch.nn.functional.interpolate(motion_spectrum[1], size=(reference_frame.shape[0], reference_frame.shape[1]), mode="bilinear"))
+        motion_spectrum = (
+            torch.nn.functional.interpolate(motion_spectrum[0], size=(reference_frame.shape[0], reference_frame.shape[1]), mode="bilinear"),
+            torch.nn.functional.interpolate(motion_spectrum[1], size=(reference_frame.shape[0], reference_frame.shape[1]), mode="bilinear")
+        )
     else:
         motion_spectrum = torch.nn.functional.interpolate(motion_spectrum, size=(reference_frame.shape[0], reference_frame.shape[1]), mode="bilinear")
     
@@ -80,6 +112,16 @@ def calculate_modal_coordinate(
 ) -> torch.Tensor:
     """
     Calculate the modal coordinate from the mode shape and displacement.
+
+    Args:
+        mode_shape (torch.Tensor): The mode shape tensor.
+        displacement (torch.Tensor): The displacement tensor.
+        pixel (tuple[int, int]): The pixel coordinates.
+        alpha (float, optional): The alpha value. Defaults to 1.0.
+        maximize (str, optional): The maximize option. Defaults to "disp".
+
+    Returns:
+        torch.Tensor: The calculated modal coordinate tensor.
     """
 
     if len(mode_shape.shape) == 3:

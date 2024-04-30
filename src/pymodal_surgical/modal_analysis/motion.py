@@ -6,6 +6,20 @@ def mode_shapes_from_optical_flow(
     K: int,
     timestep: int
 ) -> torch.Tensor:
+    """
+    Compute mode shapes from optical flow.
+
+    Args:
+        flow_field (torch.Tensor): The optical flow field tensor.
+        K (int): The number of mode shapes to compute.
+        timestep (int): The number of timesteps.
+
+    Returns:
+        torch.Tensor: The computed mode shapes tensor.
+
+    Raises:
+        ValueError: If the dimension of the flow field is not 2 for 2D tensors or 3 for 3D tensors.
+    """
     
     if len(flow_field.shape) == 4:
         flow_field = flow_field.view(-1, timestep, flow_field.shape[1], flow_field.shape[2], flow_field.shape[3])
@@ -64,6 +78,15 @@ def calculate_modal_magnitude(
 ) -> torch.Tensor:
     """
     Calculate the modal coordinate magnitude from the mode shape and displacement.
+
+    Args:
+        mode_shape (torch.Tensor): The mode shape tensor.
+        displacement (torch.Tensor): The displacement tensor.
+        pixel (tuple[int, int]): The pixel coordinates.
+        alpha (float, optional): The scaling factor. Defaults to 1.0.
+
+    Returns:
+        torch.Tensor: The modal coordinate magnitude tensor.
     """
 
     # Calculate the modal coordinate
@@ -82,6 +105,18 @@ def calculate_modal_phase(
 ) -> torch.Tensor:
     """
     Calculate the modal coordinate from the mode shape and displacement.
+
+    Args:
+        mode_shape (torch.Tensor): The mode shape tensor.
+        displacement (torch.Tensor): The displacement tensor.
+        pixel (tuple[int, int]): The pixel coordinates.
+        maximize (str, optional): The parameter to maximize. Can be 'disp' or 'velocity'. Defaults to 'disp'.
+
+    Returns:
+        torch.Tensor: The calculated modal coordinate.
+
+    Raises:
+        ValueError: If maximize is not 'disp' or 'velocity'.
     """
     if maximize not in ["disp", "velocity"]:
         raise ValueError("maximize must be 'disp' or 'velocity'")

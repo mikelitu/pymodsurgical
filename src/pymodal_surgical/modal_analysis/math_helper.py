@@ -138,6 +138,18 @@ def _norm_numpy(
     array: np.ndarray,
     as_img: bool = False
 ) -> np.ndarray:
+    """
+    Normalize the input numpy array.
+
+    Parameters:
+        array (np.ndarray): The input numpy array.
+        as_img (bool, optional): If True, the normalized array will be scaled to the range [0, 255] and converted to uint8. 
+                                 Defaults to False.
+
+    Returns:
+        np.ndarray: The normalized array.
+
+    """
     array = (array - array.min()) / (array.max() - array.min())
     if as_img:
         array = (255 * array).astype(np.uint8)
@@ -148,7 +160,19 @@ def _norm_torch(
     tensor: torch.Tensor,
     as_img: bool = False
 ) -> torch.Tensor:
+    """
+    Normalize a torch.Tensor to the range [0, 1] or [0, 255] if `as_img` is True.
+
+    Args:
+        tensor (torch.Tensor): The input tensor to be normalized.
+        as_img (bool, optional): If True, the tensor will be scaled to the range [0, 255]. 
+            If False, the tensor will be scaled to the range [0, 1]. Default is False.
+
+    Returns:
+        torch.Tensor: The normalized tensor.
+
+    """
     tensor = (tensor - tensor.min()) / (tensor.max() - tensor.min())
     if as_img:
         tensor = (255 * tensor).to(torch.uint8)
-    return tensor   
+    return tensor

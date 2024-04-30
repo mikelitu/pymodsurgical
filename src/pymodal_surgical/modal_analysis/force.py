@@ -7,7 +7,19 @@ def calculate_motion_compensation_matrix(
     timestep: float = 0.1,
     alpha: float = 0.1,
     beta: float = 0.1
-):
+) -> torch.Tensor:
+    """
+    Calculates the motion compensation matrix for a given set of frequencies.
+
+    Args:
+        frequencies (torch.Tensor): Tensor containing the frequencies.
+        timestep (float, optional): Time step value. Defaults to 0.1.
+        alpha (float, optional): Alpha value. Defaults to 0.1.
+        beta (float, optional): Beta value. Defaults to 0.1.
+
+    Returns:
+        torch.Tensor: Tensor containing the diagonal of the motion matrix.
+    """
     # conjugate_frequencies = get_conjugate(frequencies)
     numerator = torch.exp(timestep * frequencies)
     alpha_beta = alpha * frequencies + beta
@@ -30,10 +42,23 @@ def calculate_force_from_displacement_map(
     alpha: float = 0.1,
     beta: float = 0.1
 ) -> torch.Tensor:
-    
     """
     Calculate the force from the optical flow and the previous displacement vector.
+
+    Args:
+        mode_shape (torch.Tensor): The mode shape tensor.
+        displacement_map (torch.Tensor): The displacement map tensor.
+        modal_coordinate (torch.Tensor): The modal coordinate tensor.
+        frequencies (torch.Tensor): The frequencies tensor.
+        pixel (tuple[int, int]): The pixel coordinates.
+        timestep (float, optional): The timestep value. Defaults to 0.1.
+        alpha (float, optional): The alpha value. Defaults to 0.1.
+        beta (float, optional): The beta value. Defaults to 0.1.
+
+    Returns:
+        torch.Tensor: The calculated force tensor.
     """
+    
     # Calculate the motion compensation matrix
     S = calculate_motion_compensation_matrix(frequencies, timestep, alpha, beta)
     modal_coordinate = modal_coordinate.reshape(-1, 2, 1)

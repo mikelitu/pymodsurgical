@@ -9,6 +9,22 @@ def euler_solver(
     beta: float = 0.1,
     time_step: float = 0.1,
 ) -> torch.Tensor:
+    """
+    Solves the modal analysis problem using the Euler method.
+
+    Args:
+        modal_coordinate (torch.Tensor): The modal coordinates of the system.
+        frequencies (torch.Tensor): The natural frequencies of the system.
+        modal_mass (torch.Tensor): The modal masses of the system.
+        force (torch.Tensor): The external forces applied to the system.
+        alpha (float, optional): The damping coefficient. Defaults to 0.1.
+        beta (float, optional): The stiffness coefficient. Defaults to 0.1.
+        time_step (float, optional): The time step for the simulation. Defaults to 0.1.
+
+    Returns:
+        torch.Tensor: The updated modal coordinates after the simulation.
+
+    """
     modal_displacements = modal_coordinate.real
     modal_velocities = - modal_coordinate.imag * frequencies.unsqueeze(-1)
     new_q = []

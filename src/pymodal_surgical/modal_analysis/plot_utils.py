@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 import torchvision
+from PIL import Image
 from pathlib import PosixPath, Path
 from . import math_helper
 from .. import utils
@@ -14,7 +15,6 @@ def plot_and_save(imgs: list[torch.Tensor] | torch.Tensor, filename: PosixPath |
     num_rows = len(imgs)
     num_cols = len(imgs[0])
     _, axs = plt.subplots(nrows=num_rows, ncols=num_cols, figsize=(num_cols * 5, num_rows * 5), squeeze=False)
-
     for row_idx, row in enumerate(imgs):
         for col_idx, img in enumerate(row):
             ax = axs[row_idx][col_idx]

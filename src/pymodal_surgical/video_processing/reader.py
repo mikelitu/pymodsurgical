@@ -30,7 +30,7 @@ class VideoReader(object):
         self.video_path = video_path
         self.video_config = video_config
         self.video_length = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        self.video_type = video_config[video_path.stem]["video_type"]
+        self.video_type = video_config["video_type"]
         self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         self.fps = self.cap.get(cv2.CAP_PROP_FPS)

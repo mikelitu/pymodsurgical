@@ -3,6 +3,43 @@ import cv2
 import torch
 
 class GaussianFiltering:
+    """
+    A class that applies Gaussian filtering to video frames or images.
+
+    Args:
+        kernel_size (tuple[int, int] | int): The size of the Gaussian kernel. If an integer is provided,
+            the kernel will have the same size in both dimensions. If a tuple is provided, it should
+            specify the size in each dimension.
+        sigma (float | tuple[float, float]): The standard deviation(s) of the Gaussian kernel. If a single
+            float is provided, the same standard deviation will be used in both dimensions. If a tuple is
+            provided, it should specify the standard deviation in each dimension.
+
+    Methods:
+        _compute_local_contrast(img: np.ndarray) -> np.ndarray:
+            Computes the local contrast of an image.
+
+        _blur_image(img: np.ndarray) -> np.ndarray:
+            Blurs an image using Gaussian filtering.
+
+        _filter_image(img: np.ndarray, flow: np.ndarray) -> np.ndarray:
+            Applies the filtering process to an image using the local contrast and flow.
+
+        _filter_video(video: list[np.ndarray], flow: list[np.ndarray]) -> list[np.ndarray]:
+            Applies the filtering process to a list of video frames using the local contrast and flow.
+
+        _filter_stereo_video(video: tuple[list[np.ndarray], list[np.ndarray]], flow: tuple[list[np.ndarray], list[np.ndarray]]) -> tuple[list[np.ndarray], list[np.ndarray]]:
+            Applies the filtering process to a tuple of stereo video frames using the local contrast and flow.
+
+        _filter_mono_video(video: list[np.ndarray], flow: list[np.ndarray]) -> list[np.ndarray]:
+            Applies the filtering process to a list of mono video frames using the local contrast and flow.
+
+        __call__(img, flow) -> filtered_flow:
+            Applies the filtering process to an image or video frames using the local contrast and flow.
+
+    Returns:
+        np.ndarray | tuple[np.ndarray, np.ndarray] | torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
+            The filtered image or video frames.
+    """
 
     def __init__(self, kernel_size: tuple[int, int] | int = 15, sigma: float | tuple[float, float] = 0):
         self.sigma = sigma
@@ -17,17 +54,35 @@ class GaussianFiltering:
     
 
     def _compute_local_contrast(self, img: np.ndarray) -> np.ndarray:
+        """
+        Computes the local contrast of an image.
+
+        Args:
+            img (np.ndarray): The input image.
+
+        Returns:
+            np.ndarray: The local contrast of the image.
+        """
         if len(img.shape) == 3:
             if img.shape[2] == 2:
                 img = np.concatenate((img, np.zeros_like(img[:, :, 0:1])), axis=2)
             img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-        
+
         local_std = cv2.GaussianBlur(img.astype(np.float32) ** 2, self.kernel_size, self.sigma) - cv2.GaussianBlur(img.astype(np.float32), self.kernel_size, self.sigma) ** 2
         local_std = np.sqrt(np.maximum(local_std, 0))
         local_std = local_std / (local_std.max() + np.finfo(np.float32).eps)
         return local_std
     
     def _blur_image(self, img: np.ndarray) -> np.ndarray:
+        """
+        Apply Gaussian blur to an image.
+
+        Args:
+            img (np.ndarray): The input image to be blurred.
+
+        Returns:
+            np.ndarray: The blurred image.
+        """
         if img.shape[2] == 2:
             img = np.concatenate((img, np.zeros_like(img[:, :, 0:1])), axis=2)
             changed = True
@@ -38,6 +93,16 @@ class GaussianFiltering:
         return blurred_img[:, :, :2] if changed else blurred_img
     
     def _filter_image(self, img: np.ndarray, flow: np.ndarray) -> np.ndarray:
+        """
+        Apply filtering to an image using flow information.
+
+        Args:
+            img (np.ndarray): The input image.
+            flow (np.ndarray): The flow information.
+
+        Returns:
+            np.ndarray: The filtered image.
+        """
         local_std_img = self._compute_local_contrast(img)
         weighted_flow = flow * local_std_img[..., np.newaxis]
         # Normalize the weighted flow

@@ -24,7 +24,7 @@ def norm_depth(depth: np.ndarray, as_img: bool = False) -> np.ndarray:
     return _norm_numpy(depth, as_img)
 
 
-def load_depth_model_and_transform(model_type: ModelType) -> tuple[nn.Module, nn.Module]:
+def load_depth_model_and_transform(model_type: ModelType = ModelType.DPT_Large) -> tuple[nn.Module, nn.Module]:
     model = torch.hub.load(model_hub, model_type)
     transform = torch.hub.load(model_hub, "transforms")
     if model_type == ModelType.DPT_Large or model_type == ModelType.DPT_Hybrid:

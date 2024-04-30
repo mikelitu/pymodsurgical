@@ -10,7 +10,24 @@ def save_modal_coordinates(
     pixel: tuple[int, int] | None = None
 ) -> torch.Tensor:
     """
-    Save the modal coordinates into a numpy file
+    Save the modal coordinates into a numpy file.
+
+    Args:
+        modal_coordinates (torch.Tensor): The modal coordinates to be saved.
+        save_dir (str | PosixPath, optional): The directory to save the file. Defaults to "./".
+        displacement (torch.Tensor | None, optional): The displacement values. Defaults to None.
+        pixel (tuple[int, int] | None, optional): The pixel values. Defaults to None.
+
+    Returns:
+        torch.Tensor: The saved modal coordinates.
+
+    Raises:
+        None
+
+    Examples:
+        >>> modal_coordinates = torch.tensor([[1, 2, 3], [4, 5, 6]])
+        >>> save_modal_coordinates(modal_coordinates, save_dir="./data", displacement=torch.tensor([0, 0]), pixel=(100, 100))
+        Modal coordinates saved to: ./data/modal_coordinates/disp_0.0_0.0_px_100_100.npy
     """
     if displacement is None:
         displacement = (0, 0)
@@ -37,6 +54,12 @@ def save_modal_coordinates(
 def load_modal_coordinates(
     path: str
 ) -> torch.Tensor:
-    """Load the modal coordinates from a numpy file
+    """Load the modal coordinates from a numpy file.
+
+    Args:
+        path (str): The path to the numpy file.
+
+    Returns:
+        torch.Tensor: The modal coordinates loaded as a PyTorch tensor.
     """
     return torch.tensor(np.load(path))

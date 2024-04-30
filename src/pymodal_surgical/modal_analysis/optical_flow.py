@@ -71,6 +71,15 @@ def warp_flow(
 
 
 def load_flow_model(device: torch.device = torch.device("cuda:0")) -> torch.nn.Module:
+    """
+    Loads the optical flow model.
+
+    Args:
+        device (torch.device, optional): The device to load the model on. Defaults to "cuda:0".
+
+    Returns:
+        torch.nn.Module: The loaded optical flow model.
+    """
     model = raft_large(weights=Raft_Large_Weights.DEFAULT, progress=False)
     model.to(device)
     model.eval()
@@ -78,6 +87,15 @@ def load_flow_model(device: torch.device = torch.device("cuda:0")) -> torch.nn.M
 
 
 def preprocess_for_raft(batch: torch.Tensor):
+    """
+    Preprocesses the input batch of images for the RAFT model.
+
+    Args:
+        batch (torch.Tensor): The input batch of images.
+
+    Returns:
+        torch.Tensor: The preprocessed batch of images.
+    """
     tranforms = T.Compose(
         [
             T.ToTensor(),

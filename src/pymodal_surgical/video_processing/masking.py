@@ -9,7 +9,7 @@ from .reader import VideoType
 class Masking(object):
     def __init__(
         self, 
-        mask_path: PosixPath | str,
+        mask_path: PosixPath | Path | str,
         video_type: VideoType = VideoType.MONO
     ) -> None:
         if isinstance(mask_path, str):
@@ -71,7 +71,7 @@ class Masking(object):
 
     @staticmethod
     def _load_mask(mask_path: PosixPath | str) -> np.ndarray:
-        if isinstance(mask_path, PosixPath):
+        if isinstance(mask_path, PosixPath) or isinstance(mask_path, Path):
             mask_path = str(mask_path)
         
         mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
