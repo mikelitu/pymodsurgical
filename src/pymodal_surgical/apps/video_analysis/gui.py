@@ -3,12 +3,16 @@ from PySide6.QtCore import QStandardPaths, Qt, Slot, QUrl
 from PySide6.QtGui import QAction, QIcon, QKeySequence, QImageReader
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog,
                                QMainWindow, QSlider, QStyle, QToolBar, QVBoxLayout, QWidget, QLabel, QCheckBox,
-                               QInputDialog, QLineEdit, QPushButton, QMessageBox, QSpinBox, QDoubleSpinBox)
+                               QInputDialog, QLineEdit, QPushButton, QMessageBox, QSpinBox, QDoubleSpinBox,
+                               QListWidget,)
 from PySide6.QtMultimedia import (QAudioOutput, QMediaFormat,
                                   QMediaPlayer)
 from PySide6.QtMultimediaWidgets import QVideoWidget
 import os
 import cv2
+import json
+import time
+from pathlib import Path
 
 
 AVI = "video/x-msvideo"  # AVI
@@ -25,7 +29,7 @@ def get_supported_mime_types():
 def get_supported_image_formats():
     result = []
     for f in QImageReader().supportedImageFormats():
-        image_format = f.toStdString()
+        image_format = QImageReader().imageFormatsForMimeType(f)
         result.append(image_format)
         # result.append(mime_type.name())
     return result
@@ -36,7 +40,11 @@ class ConfigWindow(QDialog):
 
         video_url: QUrl = parent._player.source()
         video_path = video_url.toLocalFile()
+        video_path = Path(video_path)
+        self.experiment_name = video_path.stem
+        
         video_data = parent._metadata
+        self.fps = video_data["fps"]
         self.setWindowTitle("Configuration")
 
 
@@ -44,7 +52,7 @@ class ConfigWindow(QDialog):
         self.setLayout(self.layout)
 
         start_input = QSpinBox()
-        start_input.setRange(0, video_data["duration"] // 1000 * video_data["fps"])
+        start_input.setRange(0, int((video_data["duration"] // 1000) * int(video_data["fps"])))
         start_input.setSingleStep(1)
         start_input.setValue(0)
         start_input.setFixedWidth(self.screen().availableGeometry().width() / 10)
@@ -53,13 +61,34 @@ class ConfigWindow(QDialog):
         self.layout.addWidget(start_input)
 
         end_input = QSpinBox()
-        end_input.setRange(0, video_data["duration"] // 1000 * video_data["fps"])
+        end_input.setRange(0, int((video_data["duration"] // 1000) * int(video_data["fps"])))
         end_input.setSingleStep(1)
         end_input.setValue(video_data["duration"] // 1000 * video_data["fps"])
         end_input.setFixedWidth(self.screen().availableGeometry().width() / 10)
         end_input.valueChanged.connect(lambda: self.on_input_returned(end_input, "end"))
         self.layout.addWidget(QLabel("End frame: "))
         self.layout.addWidget(end_input)
+
+        number_of_frequencies_input = QSpinBox()
+        number_of_frequencies_input.setRange(1, 25)
+        number_of_frequencies_input.setSingleStep(1)
+        number_of_frequencies_input.setValue(16)
+        number_of_frequencies_input.setFixedWidth(self.screen().availableGeometry().width() / 10)
+        number_of_frequencies_input.valueChanged.connect(lambda: self.on_input_returned(number_of_frequencies_input, "K"))
+        self.layout.addWidget(QLabel("Number of frequencies: "))
+        self.layout.addWidget(number_of_frequencies_input)
+
+        video_type_input = QListWidget()
+        video_type_input.addItem("mono")
+        video_type_input.addItem("stereo")
+        video_type_input.setCurrentItem(video_type_input.item(0))
+        video_type_input.setFixedWidth(self.screen().availableGeometry().width() / 10)
+        video_type_input.setFixedHeight(50)
+        video_type_input.itemClicked.connect(self.on_list_widget_item_clicked)
+
+        # video_type_input.currentItemChanged.connect(lambda: self.on_input_returned(video_type_input, "video_type"))
+        self.layout.addWidget(QLabel("Video type: "))
+        self.layout.addWidget(video_type_input)
 
         self.filter_check_box = QCheckBox("Filter")
         self.layout.addWidget(self.filter_check_box)
@@ -102,6 +131,7 @@ class ConfigWindow(QDialog):
         self.file_button.setVisible(False)
 
         self.config = {"start": 0, "end": video_data["duration"] // 1000 * video_data["fps"],
+            "K": 16, "video_type": "mono",
             "filtering": {"enabled": False, "size": (11, 11), "sigma": 3.0}, 
             "masking": {"enabled": False, "mask": ""}
         }
@@ -113,15 +143,24 @@ class ConfigWindow(QDialog):
         run_button.clicked.connect(self.run_analysis)
         self.layout.addWidget(run_button)
 
+    
+    def on_list_widget_item_clicked(self, item):
+        self.config["video_type"] = item.text()
+        self.config_label.setText(self.create_config_label())
+
     def create_config_label(self):
         range_text = "Start: {} \nEnd: {}".format(self.config["start"], self.config["end"])
+        frequency_text = "Number of frequencies: {}".format(self.config["K"])
+        video_type_text = "Video type: {}".format(self.config["video_type"])
         filter_text = "Filtering:\n\tSize: ({}, {}) \n\tSigma: {}".format(
             self.config["filtering"]["size"][0], self.config["filtering"]["size"][1], self.config["filtering"]["sigma"]
         )
         mask_text = "Masking:\n\tMask: {}".format(os.path.basename(self.config["masking"]["mask"]) if self.config["masking"]["mask"] else "None")
 
-        config_text = "{}\n{}\n{}".format(
+        config_text = "{}\n{}\n{}\n{}\n{}".format(
             range_text,
+            frequency_text,
+            video_type_text,
             filter_text if self.config["filtering"]["enabled"] else "", 
             mask_text if self.config["masking"]["enabled"] else ""
         )
@@ -140,12 +179,27 @@ class ConfigWindow(QDialog):
         ensure_dialog.setDefaultButton(QMessageBox.StandardButton.Ok)
         result = ensure_dialog.exec()
         if result == QMessageBox.StandardButton.Ok:
+            self._save_config()
             self.close()
-            self.parent().close()
+            self.parent().stacked_widget.setCurrentWidget(self.parent().analyse_window)
+            time.sleep(0.5)
+            # self.parent().close()
+            self.parent().analyse_window.init(self.config)
+            
         else:
             ensure_dialog.close()
             return
 
+    def _save_config(self):
+        self.experiment_path = Path(f"results/{self.experiment_name}")
+        self.experiment_path.mkdir(parents=True, exist_ok=True)
+        analysed_video = self.parent()._player.source().toLocalFile()
+        self.config["video_path"] = analysed_video
+        self.config["fps"] = self.fps
+
+        with open(self.experiment_path/"mode_shape.json", "w") as f:
+            json.dump(self.config, f, indent=4, sort_keys=False)
+    
     def filter_state_changed(self, state):
 
         if state == 2:
@@ -166,9 +220,9 @@ class ConfigWindow(QDialog):
     def on_input_returned(self, input_field: QLineEdit, tag: str = None):
         user_input = input_field.text()
         if tag == "size":
-            self.config["filtering"][tag] = (int(user_input), int(user_input))
+            self.config["filtering"][tag] = int(user_input)
         elif tag == "sigma":
-            self.config["filtering"][tag] = float(user_input)
+            self.config["filtering"][tag] = float(user_input)       
         else:
             self.config[tag] = int(user_input) 
             
@@ -203,9 +257,13 @@ class ConfigWindow(QDialog):
 
 class MainWindow(QMainWindow):
 
-    def __init__(self):
+    def __init__(self, stacked_widget: QWidget | None = None, analyse_window: QMainWindow | None = None):
         super().__init__()
 
+        self.setWindowTitle("Video Player")
+        self.setGeometry(100, 100, 800, 600)
+        self.stacked_widget = stacked_widget
+        self.analyse_window = analyse_window
         self._playlist = []  # FIXME 6.3: Replace by QMediaPlaylist?
         self._playlist_index = -1
         self._audio_output = QAudioOutput()
@@ -238,12 +296,8 @@ class MainWindow(QMainWindow):
         compute_action = QAction(icon, "&Start", self, 
                                  shortcut="Ctrl+A", triggered=self.open_config)
         
-        flow_action = QAction(icon, "&Flow", self,
-                              shortcut="Ctrl+F", triggered=self.open_config)
-        
         self.analyse_menu.addAction(compute_action)
         tool_bar.addAction(compute_action)
-        self.analyse_menu.addAction(flow_action)
         self.analyse_menu.setVisible(False)
 
         icon = QIcon.fromTheme("media-seek-backward")

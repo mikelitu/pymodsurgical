@@ -16,27 +16,22 @@ class ForceEstimator():
 
     def __init__(
         self,
-        force_estimation_video_path: str | Path,
         force_estimation_config: dict,
-        mode_shape_video_path: str | Path,
         mode_shape_config: dict,
-        K: int = 16,
     ) -> None:
         
-        mode_shape_calculator = ModeShapeCalculator(mode_shape_video_path, mode_shape_config, K)
+        mode_shape_calculator = ModeShapeCalculator(mode_shape_config)
 
         self.mode_shapes = mode_shape_calculator.complex_mode_shapes
-        print(self.mode_shapes.abs().max(), self.mode_shapes.abs().min())
         self.frequencies = mode_shape_calculator.frequencies
-        self._load_force_video(force_estimation_video_path, force_estimation_config)
+        self._load_force_video(force_estimation_config)
     
     def _load_force_video(
         self,
-        force_estimation_video_path: str | Path,
         force_estimation_config: dict
     ) -> VideoReader:
         
-        self.force_video_reader = VideoReader(force_estimation_video_path, video_config=force_estimation_config["video_config"])
+        self.force_video_reader = VideoReader(video_config=force_estimation_config)
         self.flow_model = optical_flow.load_flow_model(device)
 
     
@@ -81,17 +76,16 @@ class ForceEstimator():
 
 
 if __name__ == "__main__":
-    mode_shape_video_path = Path("videos/heart_beating.mp4")
     mode_shape_config = {
-        "video_config": {
-            "fps": 30,
-            "video_type": "mono"
-        },
+        "video_path": "C:\\Users\\md21\\surgical-video-modal-analysis\\videos\\20240430_041703.mp4",
+        "K": 16,
+        "fps": 20.0,
+        "video_type": "mono",
         "start": 0,
         "end": 0,
         "masking": {
             "enabled": True,
-            "mask": "videos/mask/heart_beating.png"
+            "mask": "C:\\Users\\md21\\surgical-video-modal-analysis\\videos\\mask\\heart_beating.png"
         },
         "filtering": {
             "enabled": True,
@@ -99,19 +93,15 @@ if __name__ == "__main__":
             "sigma": 3.0
         }
     }
-    force_video_path = Path("videos/20240430_041703.mp4")
     force_video_config = {
-        "video_config": {
-            "fps": 30,
-            "video_type": "mono"
-        }
+        "fps": 20.0,
+        "video_type": "mono",
+        "video_path": "C:/Users/md21/surgical-video-modal-analysis/videos/20240430_041703.mp4",
     }
 
     estimator = ForceEstimator(
-        force_estimation_video_path=force_video_path,
         force_estimation_config=force_video_config,
-        mode_shape_video_path=mode_shape_video_path,
         mode_shape_config=mode_shape_config
     )
 
-    estimator._calculate_force(0, 270, (10, 30))
+    estimator._calculate_force(270, 360, (10, 30))

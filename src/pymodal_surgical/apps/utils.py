@@ -17,23 +17,27 @@ class ModeShapeCalculator():
 
     def __init__(
         self,
-        video_path: str | Path,
         config: dict,
-        K: int = 16,
     ) -> None:
         
+        video_path = Path(config["video_path"])
+        K = config["K"]
         experiment_name = video_path.stem
         self.experiment_dir = Path(f"results/{experiment_name}")
         self.cached = False
 
-        self._load_experiment(video_path, config, K)
+        self._load_experiment(config)
         
         if not self.cached:
-            self.mode_shapes, self.flows = self._calculate_mode_shapes(filter_config=config["filtering"])
+            if config["video_type"] == "stereo":
+                self.mode_shapes, self.flows = self._calculate_mode_shapes(filter_config=config["filtering"], camera_pos="left")
+            else:
+                self.mode_shapes, self.flows = self._calculate_mode_shapes(filter_config=config["filtering"])
+            
             self._save_complex_mode_shapes()
         
         self.complex_mode_shapes = mode_shape_2_complex(self.mode_shapes)
-        self.frequencies = get_motion_frequencies(len(self.frames), K, 1./config["video_config"]["fps"])
+        self.frequencies = get_motion_frequencies(len(self.frames), K, 1./config["fps"])
 
     def _calculate_mode_shapes(
         self,
@@ -48,13 +52,15 @@ class ModeShapeCalculator():
     
     def _load_experiment(
         self,
-        video_path: str | Path,
         config: dict,
-        K: int,
     ) -> None:
         
-        video_reader = VideoReader(video_path, video_config=config["video_config"])
-        self.frames = video_reader.read(config["start"], config["end"])
+        video_reader = VideoReader(config)
+
+        self.frames = video_reader.read(int(config["start"]), int(config["end"]))
+
+        if config["video_type"] == "stereo":
+            self.frames = self.frames[0] # Just keep the left frames
 
         if self.experiment_dir.exists():
             print(f"Experiment directory {self.experiment_dir} already exists. Trying to load cached data.")
@@ -78,7 +84,7 @@ class ModeShapeCalculator():
         else:
             self.mask = None
         
-        self.K = K
+        self.K = config["K"]
 
     def _calculate_depth(
         self

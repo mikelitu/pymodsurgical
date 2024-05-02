@@ -3,6 +3,7 @@ from pathlib import Path, PosixPath
 from pymodal_surgical.video_processing.reader import VideoReader, VideoType, RetType
 import json
 from pymodal_surgical.video_processing.masking import Masking
+from pymodal_surgical.modal_analysis import depth
 import torch
 from pymodal_surgical.modal_analysis.math_helper import mode_shape_2_complex
 from pymodal_surgical.modal_analysis.utils import save_modal_coordinates
@@ -13,8 +14,33 @@ from torchvision.utils import flow_to_image
 
 class VideoAnalyzer():
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, config: dict) -> None:
+        self._load_experiment(config)
+
+    
+    def _calculate_mode_shapes(self, frames, K, filtering, mask):
+        if isinstance(frames, tuple):
+            return (functions.calculate_mode_shapes(frames[0], K, filter_config=filtering, mask=mask, camera_pos="left", save_flow_video=True), functions.calculate_motion_spectrum(frames[1], K, filtered=filtering, mask=mask, camera_pos="right"))
+        else:
+            return functions.calculate_mode_shapes(frames, K, filtered=filtering, mask=mask)
+
+    def _save_mode_shape(self, mode_shapes, save_dir, filtering, masked):
+        if isinstance(mode_shapes, tuple):
+            for i in range(2):
+                functions.save_mode_shape()
+        else:
+            functions.save_mode_shape(mode_shapes, save_dir, filtered=filtering, masked=masked)     
+    def _load_experiment(self, config):
+        video_reader = VideoReader(video_config=config, return_type=RetType.NUMPY)
+        self.frames = video_reader.read(int(config["start"]), int(config["end"]))
+        self.depth_model, self.depth_transform = depth.load_depth_model_and_transform()
+        if config["masking"]["enabled"]:
+            self.mask = Masking(config["masking"]["mask"], video_reader.video_type)
+        else:
+            self.mask = None
+        
+
+
 
 
 def main(
