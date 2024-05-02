@@ -23,8 +23,6 @@ classifiers = [
 dependencies = [
     "attrs==23.2.0",
     "Automat==22.10.0",
-    "build==1.2.1",
-    "buildtools==1.0.6",
     "certifi==2024.2.2",
     "charset-normalizer==3.3.2",
     "colorama==0.4.6",
