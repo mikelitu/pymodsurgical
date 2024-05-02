@@ -18,10 +18,11 @@ class VideoReader(object):
 
     def __init__(
         self,
-        video_path: str | PosixPath,
         video_config: dict[str, VideoType | str | PosixPath],
         return_type: RetType | str = RetType.NUMPY,
     ) -> None:
+        
+        video_path = video_config["video_path"]
         
         if not isinstance(video_path, PosixPath):
             video_path = Path(video_path)
@@ -39,10 +40,10 @@ class VideoReader(object):
         self._return_func = {RetType.NUMPY: self._return_numpy, RetType.TENSOR: self._return_tensor, RetType.LIST: self._return_list}[return_type]
         
         try:
-            self._left_calibration_matrix = np.array(video_config[video_path.stem]["left_calibration_matrix"][:9]).reshape(3, 3)
-            self._left_distortion_coefficients = np.array(video_config[video_path.stem]["left_calibration_matrix"][9:])
-            self._right_calibration_matrix = np.array(video_config[video_path.stem]["right_calibration_matrix"][:9]).reshape(3, 3)
-            self._right_distortion_coefficients = np.array(video_config[video_path.stem]["right_calibration_matrix"][9:])
+            self._left_calibration_matrix = np.array(video_config["left_calibration_matrix"][:9]).reshape(3, 3)
+            self._left_distortion_coefficients = np.array(video_config["left_calibration_matrix"][9:])
+            self._right_calibration_matrix = np.array(video_config["right_calibration_matrix"][:9]).reshape(3, 3)
+            self._right_distortion_coefficients = np.array(video_config["right_calibration_matrix"][9:])
         
         except Exception:
             print("Calibration cofficients not found in metadata...")
