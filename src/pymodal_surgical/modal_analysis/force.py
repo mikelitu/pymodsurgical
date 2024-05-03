@@ -37,7 +37,8 @@ def calculate_force_from_displacement_map(
     displacement_map: torch.Tensor,
     modal_coordinate: torch.Tensor,
     frequencies: torch.Tensor,
-    pixel: tuple[int, int],
+    pixel: tuple[tuple[int, int], tuple[int, int]] | tuple[int, int],
+    simplify_force: bool = True,
     timestep: float = 0.1,
     alpha: float = 0.1,
     beta: float = 0.1
@@ -59,26 +60,37 @@ def calculate_force_from_displacement_map(
         torch.Tensor: The calculated force tensor.
     """
     
+    if isinstance(pixel[0], tuple):
+        pix_w = pixel[0]
+        pix_h = pixel[1]
+    
     # Calculate the motion compensation matrix
     S = calculate_motion_compensation_matrix(frequencies, timestep, alpha, beta)
     modal_coordinate = modal_coordinate.reshape(-1, 2, 1)
-
-    displacement_vector = displacement_map[:, *pixel].unsqueeze(-1)
+    
+    displacement_vector = displacement_map[:, pix_w[0]:pix_w[1], pix_h[0]:pix_h[1]]
 
     force_sign = torch.sign(displacement_vector).squeeze(-1)
-    pixel_mode_shape = mode_shape[:, :, *pixel].unsqueeze(-1)
-    trans_pixel_mode_shape = pixel_mode_shape.transpose(1, 2)
-    mode_shape_mult = pixel_mode_shape * S.unsqueeze(-1).unsqueeze(-1) @ trans_pixel_mode_shape
+    pixel_mode_shape = mode_shape[:, :, pix_w[0]:pix_w[1], pix_h[0]:pix_h[1]]
+    trans_pixel_mode_shape = pixel_mode_shape.transpose(2, 3)
+    mode_shape_mult = pixel_mode_shape * S.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1) @ trans_pixel_mode_shape
     inv_mode_shape_mult = mode_shape_mult.pinverse()
     inv_mode_shape_mult = math_helper.orthonormal_normalization(inv_mode_shape_mult)
     
-    state_difference = displacement_vector - pixel_mode_shape * modal_coordinate
+    if torch.all(modal_coordinate == 0):
+        state_difference = displacement_vector
+    else:
+        state_difference = displacement_vector - pixel_mode_shape * modal_coordinate
 
     # Apply the constraint problem to calculate the force from a manipulation of the displacement vector
-    force = (2 / (timestep ** 2)) * (inv_mode_shape_mult * state_difference)
+
+    force = (2 / (timestep ** 2)) * (inv_mode_shape_mult @ state_difference.to(dtype=torch.cfloat))
     
     # Force is the sum of the absolute value of the force in the x and y direction
-    force = force.abs().sum(dim=0).sum(dim=1)
+    
+    force = force.abs().sum(dim=0)
     force = force_sign * force
+    if simplify_force:
+        force = force.sum(dim=1).sum(dim=1)
 
     return force / 1.e6
