@@ -8,7 +8,7 @@ from pathlib import Path, PosixPath
 from pymodal_surgical.video_processing.masking import Masking
 import math
 import numpy as np
-from enum import StrEnum
+from enum import Enum
 
 try:
     from dataclasses import dataclass, field
@@ -54,7 +54,7 @@ try:
 except NameError:
     pass
 
-class ControlType(StrEnum):
+class ControlType(Enum, str):
     MOUSE = "mouse"
     HAPTIC = "haptic"
 

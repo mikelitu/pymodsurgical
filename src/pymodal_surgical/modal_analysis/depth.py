@@ -2,13 +2,13 @@ import torch
 import torch.nn.functional as F
 import torch.nn as nn
 import numpy as np
-from enum import StrEnum
+from enum import Enum
 from .math_helper import _norm_numpy, _norm_torch
 from sklearn.cluster import KMeans
 
 model_hub = "intel-isl/MiDaS"
 
-class ModelType(StrEnum):
+class ModelType(Enum, str):
     DPT_Large = "DPT_Large"
     DPT_Hybrid = "DPT_Hybrid"
     MiDaS_small = "MiDaS_small"
