@@ -24,6 +24,7 @@ class ModeShapeCalculator():
         K = config["K"]
         experiment_name = video_path.stem
         self.experiment_dir = Path(f"results/{experiment_name}")
+        print(self.experiment_dir)
         self.cached = False
 
         self._load_experiment(config)
@@ -97,3 +98,9 @@ class ModeShapeCalculator():
         
         save_path = self.experiment_dir/"mode_shapes"
         save_complex_mode_shape(self.mode_shapes, Path(save_path))
+
+
+    def _save_rgb_mode_shapes(
+        self
+    ) -> None:
+        pass
