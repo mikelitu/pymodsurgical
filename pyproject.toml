@@ -72,7 +72,6 @@ dependencies = [
     "torchvision==0.17.1",
     "tqdm==4.66.2",
     "Twisted==24.3.0",
-    "twisted-iocpsupport==1.0.4",
     "typing_extensions==4.10.0",
     "urllib3==2.2.1",
     "zope.interface==6.3",
