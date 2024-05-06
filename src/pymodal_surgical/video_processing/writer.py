@@ -10,10 +10,10 @@ class VideoWriter(object):
 
     def __init__(
         self,
-        video_path: str | Path,
         video_config: dict[str, str | int | float | bool | VideoType],
     ) -> None:
         
+        video_path = video_config["video_path"]
         if not isinstance(video_path, Path):
             video_path = Path(video_path)
 
@@ -57,6 +57,7 @@ class VideoWriter(object):
         for i in range(len(frames[0])):
             frame = np.concatenate((cv2.cvtColor(frames[0][i], cv2.COLOR_RGB2BGR), cv2.cvtColor(frames[1][i], cv2.COLOR_RGB2BGR)), axis=1)
             out.write(frame)
+        
         out.release()
 
     def __call__(self, frames: np.ndarray | torch.Tensor) -> None:
