@@ -15,10 +15,12 @@ class TestVideoWriter(unittest.TestCase):
         cls.save_path.mkdir(exist_ok=True, parents=True)
         video_config_dic = {
             "output_mono": {
+                "video_path": cls.save_path/"output_mono.mp4",
                 "fps": 30,
                 "video_type": "mono"
             },
             "output_stereo": {
+                "video_path": cls.save_path/"output_stereo.mp4",
                 "fps": 30,
                 "video_type": "stereo"
             }
@@ -28,8 +30,8 @@ class TestVideoWriter(unittest.TestCase):
     def test_write_mono(self):
         # Create a VideoWriter instance
         video_path = self.save_path/"output_mono.mp4"
-        video_config = {"fps": 30, "video_type": "mono"}
-        writer = VideoWriter(video_path, video_config)
+        video_config = {"video_path": video_path, "fps": 30, "video_type": "mono"}
+        writer = VideoWriter(video_config)
 
         # Generate some dummy frames
         frames = np.random.randint(0, 255, size=(10, 480, 640, 3), dtype=np.uint8)
@@ -44,17 +46,18 @@ class TestVideoWriter(unittest.TestCase):
         self.assertTrue(video_path.suffix == ".mp4")
 
         # Open the video and verify the number of frames
-        reader = VideoReader(video_path, self.reader_video_config, return_type=RetType.NUMPY)
+        reader = VideoReader(self.reader_video_config["output_mono"], return_type=RetType.NUMPY)
         self.assertEqual(len(reader), 10)
         self.assertEqual(reader.video_type, "mono")
         self.assertEqual(reader.fps, 30)
+        reader._close()
 
 
     def test_write_stereo(self):
         # Create a VideoWriter instance
         video_path = self.save_path/"output_stereo.mp4"
-        video_config = {"fps": 30, "video_type": "stereo"}
-        writer = VideoWriter(video_path, video_config)
+        video_config = {"video_path": video_path, "fps": 30, "video_type": "stereo"}
+        writer = VideoWriter(video_config)
 
         # Generate some dummy frames
         frames_left = np.random.randint(0, 255, size=(10, 480, 640, 3), dtype=np.uint8)
@@ -72,10 +75,11 @@ class TestVideoWriter(unittest.TestCase):
         self.assertTrue(video_path.suffix == ".mp4")
 
         # Open the video and verify the number of frames
-        reader = VideoReader(video_path, self.reader_video_config, return_type=RetType.NUMPY)
+        reader = VideoReader(self.reader_video_config["output_stereo"], return_type=RetType.NUMPY)
         self.assertEqual(len(reader), 10)
         self.assertEqual(reader.video_type, "stereo")
         self.assertEqual(reader.fps, 30)
+        reader._close()
 
     @classmethod
     def tearDownClass(cls) -> None:

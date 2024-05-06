@@ -9,14 +9,14 @@ import unittest
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 def read_video(
-    video_path: str | Path,
+    video_name: str,
     metadata_path: str | Path,
     return_type: str = "numpy",
 ) -> VideoReader:
     with open(metadata_path, "r") as f:
         video_config = json.load(f)
     
-    return VideoReader(video_path, video_config, return_type)
+    return VideoReader(video_config[video_name], return_type)
 
 
 def init_depth(
@@ -31,7 +31,7 @@ class TestDepth(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.depth_model, cls.depth_transform = init_depth()
         cls.depth_model.to(device)
-        reader = read_video(Path("videos/liver_stereo.avi"), Path("videos/metadata.json"))
+        reader = read_video("liver_stereo", Path("videos/metadata.json"))
         cls.frame = reader.read_frame(0)[0] if reader.video_type == "stereo" else reader.read_frame(0)
         cls.intrinsics = reader.left_calibration_mat
         cls.frames = reader.read(0, 10)[0] if reader.video_type == "stereo" else reader.read(0, 10)

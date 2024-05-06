@@ -1,10 +1,7 @@
 import unittest
 import torch
 import numpy as np
-from pathlib import Path
 import pymodal_surgical.modal_analysis.math_helper as math_helper
-from pymodal_surgical.modal_analysis.utils import save_modal_coordinates, load_modal_coordinates
-import shutil
 
 class TestComplex(unittest.TestCase):
     def test_tensor_rotate_phase_to_real_axis(self):

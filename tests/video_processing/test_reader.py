@@ -8,15 +8,13 @@ import numpy as np
 class TestVideoReader(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        stereo_video_path = "videos/liver_stereo.avi"
-        mono_video_path = "videos/rgb.mp4"
         with open("videos/metadata.json", "r") as f:
             video_config = json.load(f)
 
-        cls.stereo_video_reader_np = VideoReader(stereo_video_path, video_config, return_type=RetType.NUMPY)
-        cls.stereo_video_reader_torch = VideoReader(stereo_video_path, video_config, return_type=RetType.TENSOR)
-        cls.mono_video_reader_np = VideoReader(mono_video_path, video_config, return_type=RetType.NUMPY)
-        cls.mono_video_reader_torch = VideoReader(mono_video_path, video_config, return_type=RetType.TENSOR)
+        cls.stereo_video_reader_np = VideoReader(video_config["liver_stereo"], return_type=RetType.NUMPY)
+        cls.stereo_video_reader_torch = VideoReader(video_config["liver_stereo"], return_type=RetType.TENSOR)
+        cls.mono_video_reader_np = VideoReader(video_config["rgb"], return_type=RetType.NUMPY)
+        cls.mono_video_reader_torch = VideoReader(video_config["rgb"], return_type=RetType.TENSOR)
 
 
     def test_read_frame_stereo(self):
@@ -60,3 +58,10 @@ class TestVideoReader(unittest.TestCase):
         self.assertTrue(isinstance(frames_torch, torch.Tensor))
         self.assertFalse(isinstance(type(frames_np), type(frames_torch)))
         self.assertTrue(frames_np[0].shape[0] == frames_torch[0].shape[1] and frames_np[0].shape[1] == frames_torch[0].shape[2])
+    
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.stereo_video_reader_np._close()
+        cls.stereo_video_reader_torch._close()
+        cls.mono_video_reader_np._close()
+        cls.mono_video_reader_torch._close()
