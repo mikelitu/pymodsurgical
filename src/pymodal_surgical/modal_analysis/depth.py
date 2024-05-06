@@ -8,7 +8,7 @@ from sklearn.cluster import KMeans
 
 model_hub = "intel-isl/MiDaS"
 
-class ModelType(Enum, str):
+class ModelType(str, Enum):
     DPT_Large = "DPT_Large"
     DPT_Hybrid = "DPT_Hybrid"
     MiDaS_small = "MiDaS_small"
