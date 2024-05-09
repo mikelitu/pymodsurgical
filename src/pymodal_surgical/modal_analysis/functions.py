@@ -8,6 +8,7 @@ from ..video_processing.writer import VideoWriter
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
 model = optical_flow.load_flow_model(device)
 
+
 def calculate_mode_shapes(
     frames: list[np.ndarray], 
     K: int,
@@ -37,7 +38,7 @@ def calculate_mode_shapes(
     
     preprocess_frames = [optical_flow.preprocess_for_raft(frame) for frame in frames]
     preprocess_frames = torch.stack(preprocess_frames).to(device)
-    
+
     B = preprocess_frames.shape[0]
     flows = torch.zeros((B - 1, 2, preprocess_frames.shape[2], preprocess_frames.shape[3])).to(device)
 
@@ -49,7 +50,7 @@ def calculate_mode_shapes(
         for i in range(number_of_batches):
             start = i * batch_size
             end = (i + 1) * batch_size
-            flows[start:end] = optical_flow.estimate_flow(model, reference_frames, target_frames[start:end]).squeeze(0)
+            flows[start:end] = optical_flow.estimate_flow(model, reference_frames[start:end], target_frames[start:end]).squeeze(0)
     else:
         flows = optical_flow.estimate_flow(model, reference_frames, target_frames).squeeze(0)
 

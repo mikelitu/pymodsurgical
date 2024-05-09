@@ -189,6 +189,14 @@ class VideoReader(object):
         return self.video_length
     
     @property
+    def video_width(self) -> int:
+        return self.width
+    
+    @property
+    def video_height(self) -> int:
+        return self.height
+    
+    @property
     def left_fx(self) -> float:
         return self._left_calibration_matrix[0, 0]
     
