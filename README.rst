@@ -14,6 +14,19 @@ To install the package, clone the repository and run the following commands in t
     pip install ./dist/pymodal_surgical-0.1.0.tar.gz
 
 
+Applications
+-------------
+The package can be used for the following applications:
+
+#. **Video Modal Analysis**: The package can be used to extract the modal basis of a soft tissue from a video. The modal basis can be used to simulate the deformation of the tissue or to calculate the forces from a givern deformation in a direct manipulation video.
+
+#. **Manipulation analysis**: The package provides a tool to determine the camera projected force in an image based on the modal basis of the tissue and the optical flow of an image sequence. The application can used the previously cached modal basis or calculate it on the fly. The application receives a video and user selected ROI of pixels. It can either output a single force vector that represents the mean force on the area or a force vector for each pixel in the ROI.
+
+#. **Interactive demo**: The package provides the possibility to generate realistic looking simulations of soft tissue deformation. The user can interact with the simulation by applying forces to the tissue and observing the deformation. The simulation is based on the modal basis of the tissue and the optical flow of the image sequence. The simulation uses a single frame and right now only provides the possibility of interacting with a single pixel.
+
+For more information refer to :doc:`src\pymodal_surgical\apps\README.md`_.
+
+
 References
 -----------
 .. _[1]:
