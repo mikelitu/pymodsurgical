@@ -24,7 +24,7 @@ The package can be used for the following applications:
 
 #. **Interactive demo**: The package provides the possibility to generate realistic looking simulations of soft tissue deformation. The user can interact with the simulation by applying forces to the tissue and observing the deformation. The simulation is based on the modal basis of the tissue and the optical flow of the image sequence. The simulation uses a single frame and right now only provides the possibility of interacting with a single pixel.
 
-For more information refer to :doc:`src\pymodal_surgical\apps\README.md`_.
+For more information refer to `documentation <src\pymodal_surgical\apps\README.md>`_.
 
 
 References
