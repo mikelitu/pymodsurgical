@@ -22,7 +22,7 @@ def read_video(
 def init_depth(
     model_type: depth.ModelType = depth.ModelType.DPT_Large
 ) -> tuple[torch.nn.Module, torch.nn.Module]:
-    return depth.load_depth_model_and_transform(model_type=model_type)
+    return depth.load_depth_model_and_transform(model_type=model_type, device=device)
 
 
 class TestDepth(unittest.TestCase):
