@@ -64,6 +64,7 @@ def calculate_force_from_displacement_map(
         pix_w = pixel[0]
         pix_h = pixel[1]
     
+    area = (pix_w[1] - pix_w[0]) * (pix_h[1] - pix_h[0])
     # Calculate the motion compensation matrix
     S = calculate_motion_compensation_matrix(frequencies, timestep, alpha, beta)
     modal_coordinate = modal_coordinate.reshape(-1, 2, 1)
@@ -90,7 +91,8 @@ def calculate_force_from_displacement_map(
     
     force = force.abs().sum(dim=0)
     force = force_sign * force
+    
     if simplify_force:
-        force = force.sum(dim=1).sum(dim=1)
+        force = force.mean(dim=1).mean(dim=1)
 
-    return force / 1.e6
+    return force / area

@@ -1,14 +1,19 @@
 import torch
+import torchvision
 import numpy as np
 from pathlib import Path
 from pymodal_surgical.video_processing.masking import Masking
 from pymodal_surgical.video_processing.reader import VideoReader
 from pymodal_surgical.modal_analysis import functions
-from pymodal_surgical.modal_analysis.depth import load_depth_model_and_transform, ModelType
+from pymodal_surgical.modal_analysis.depth import load_depth_model_and_transform, ModelType, calculate_depth_map
 from pymodal_surgical.modal_analysis import mode_shape_2_complex
 from pymodal_surgical.modal_analysis.plot_utils import save_complex_mode_shape
 from pymodal_surgical.modal_analysis.motion import get_motion_frequencies
+from pymodal_surgical.modal_analysis.optical_flow import warp_flow
 from PIL import Image
+from torchvision.utils import flow_to_image
+import cv2
+
 
 
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
@@ -24,7 +29,6 @@ class ModeShapeCalculator():
         K = config["K"]
         experiment_name = video_path.stem
         self.experiment_dir = Path(f"results/{experiment_name}")
-        print(self.experiment_dir)
         self.cached = False
 
         self._load_experiment(config)
@@ -36,13 +40,14 @@ class ModeShapeCalculator():
                 self.mode_shapes, self.flows = self._calculate_mode_shapes(filter_config=config["filtering"])
             
             self._save_complex_mode_shapes()
+            self._save_rgb_mode_shapes()
+            self._save_mode_target()
         
         self.complex_mode_shapes = mode_shape_2_complex(self.mode_shapes)
         self.frequencies = get_motion_frequencies(len(self.frames), K, 1./config["fps"])
 
     def _calculate_mode_shapes(
         self,
-        depth_maps: list[np.ndarray] | None = None,
         batch_size: int = 500,
         filter_config: dict | None = None,
         camera_pos: str | None = None,
@@ -79,7 +84,7 @@ class ModeShapeCalculator():
                 return
         
         
-        self.depth_model, self.depth_transform = load_depth_model_and_transform(ModelType.DPT_Large)
+        self.depth_model, self.depth_transform = load_depth_model_and_transform(ModelType.DPT_Large, device)
         if config["masking"]["enabled"]:
             self.mask = Masking(config["masking"]["mask"], video_reader.video_type)
         else:
@@ -103,4 +108,29 @@ class ModeShapeCalculator():
     def _save_rgb_mode_shapes(
         self
     ) -> None:
-        pass
+        save_path = self.experiment_dir/"rgb_mode_shapes"
+        save_path.mkdir(parents=True, exist_ok=True)
+        complex_mode_shape = mode_shape_2_complex(self.mode_shapes)
+        abs_mode_shapes = torch.abs(complex_mode_shape)
+        for i in range(abs_mode_shapes.shape[0]):
+            img_mode_shape = flow_to_image(abs_mode_shapes[i].cpu())
+            img_mode_shape = torchvision.transforms.functional.to_pil_image(img_mode_shape)
+            img_mode_shape.save(save_path/f"mode_{i}.png")
+
+    def _save_mode_target(
+        self
+    ) -> None:
+        save_path = self.experiment_dir/"mode_target"
+        save_path.mkdir(parents=True, exist_ok=True)
+        complex_mode_shape = mode_shape_2_complex(self.mode_shapes)
+        frame = cv2.resize(self.frames[0], (128, 128))
+        abs_mode_shapes = torch.abs(complex_mode_shape)
+        tensor_frame = torch.from_numpy(frame).permute(2, 0, 1).to(device)
+        depth_map = calculate_depth_map(self.depth_model, self.depth_transform, frame, device=device)
+        depth_map = (depth_map - depth_map.min()) / (depth_map.max() - depth_map.min())
+        for i in range(abs_mode_shapes.shape[0]):
+            increased_mode_shape = abs_mode_shapes[i] * 10.
+            increased_mode_shape = increased_mode_shape.to(device)
+            target_mode_shape = warp_flow(tensor_frame, increased_mode_shape, depth_map=depth_map, mask=self.mask.mask.cpu().numpy(), near=0.0, far=1.0)
+            img_mode_shape = Image.fromarray(target_mode_shape)
+            img_mode_shape.save(save_path/f"mode_{i}.png")
