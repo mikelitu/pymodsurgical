@@ -7,7 +7,7 @@ from .math_helper import _norm_numpy, _norm_torch
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 from pathlib import Path
-from utils import create_save_dir
+from ..utils import create_save_dir
 from mpl_toolkits.mplot3d import Axes3D
 
 
