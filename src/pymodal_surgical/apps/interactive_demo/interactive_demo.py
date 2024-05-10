@@ -388,20 +388,20 @@ class InteractiveDemo(object):
 
     def _init_video_reader(
         self,
-        video_path: PosixPath | str,
+        video_config: PosixPath | str,
         start: int,
         end: int
     ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         """
         Initialize the video reader and read the frames.
         """
+
+        video_path = video_config["video_path"]
+
         if isinstance(video_path, str):
             video_path = Path(video_path)
         
-        with open("videos/metadata.json", "r") as f:
-            video_config = json.load(f)
-        
-        self.video_reader = VideoReader(video_path, video_config, return_type=RetType.NUMPY)
+        self.video_reader = VideoReader(video_config, return_type=RetType.NUMPY)
         return self.video_reader.read(start, end)
     
 

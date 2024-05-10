@@ -153,7 +153,7 @@ class ConfigWindow(QDialog):
         frequency_text = "Number of frequencies: {}".format(self.config["K"])
         video_type_text = "Video type: {}".format(self.config["video_type"])
         filter_text = "Filtering:\n\tSize: ({}, {}) \n\tSigma: {}".format(
-            self.config["filtering"]["size"][0], self.config["filtering"]["size"][1], self.config["filtering"]["sigma"]
+            self.config["filtering"]["size"], self.config["filtering"]["size"], self.config["filtering"]["sigma"]
         )
         mask_text = "Masking:\n\tMask: {}".format(os.path.basename(self.config["masking"]["mask"]) if self.config["masking"]["mask"] else "None")
 

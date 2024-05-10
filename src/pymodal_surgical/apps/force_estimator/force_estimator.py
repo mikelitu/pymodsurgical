@@ -8,6 +8,7 @@ import pymodal_surgical.modal_analysis.optical_flow as optical_flow
 import pymodal_surgical.modal_analysis.force as force
 import pymodal_surgical.modal_analysis.math_helper as math_helper
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 import cv2
 from pymodal_surgical.utils import create_save_dir
 from torchvision.utils import flow_to_image
@@ -87,18 +88,22 @@ class ForceEstimator():
         force: torch.Tensor,
     ) -> np.ndarray:
         
-        X, Y = np.meshgrid(np.arange(0, self.force_mask.shape[2]), np.arange(0, self.force_mask.shape[1]))
+        gd = 5
+        X, Y = np.mgrid[0:128:gd, 0:128:gd]
         self.force_mask[:, self.pixels[0][0]:self.pixels[0][1], self.pixels[1][0]:self.pixels[1][1]] = force
-        U = self.force_mask[0].numpy()
-        V = self.force_mask[1].numpy()
+        U = self.force_mask[0, ::gd, ::gd].numpy()
+        V = self.force_mask[1, ::gd, ::gd].numpy()
 
         frame = cv2.resize(frame, (128, 128))
+        # frame_slice = frame[::gd, ::gd]
 
-        figsize = (frame.shape[1] / 100, frame.shape[0] / 100)
-        fig = plt.figure(figsize=figsize, dpi=100)
+        figsize = (frame.shape[1] / 10, frame.shape[0] / 10)
+        fig = plt.figure(figsize=figsize, dpi=10)
         ax = fig.add_subplot([0, 0, 1, 1])
-        # ax.imshow(frame)
-        ax.quiver(X, Y, U, V, color="black", scale=30)
+        ax.imshow(frame, zorder=0, alpha=1.0, interpolation="hermite")
+        rect = patches.Rectangle((self.pixels[1][0], self.pixels[0][0]), self.pixels[1][1] - self.pixels[1][0], self.pixels[0][1] - self.pixels[0][0], linewidth=3, edgecolor="k", facecolor="none")
+        ax.quiver(X, Y, U, V, color="yellow", scale=10)
+        ax.add_patch(rect)
         ax.axis("off")
 
         canvas = FigureCanvas(fig)
@@ -175,7 +180,6 @@ class ForceEstimator():
             blended_force = self._blend_quiver_with_frame(frame_2, constraint_force)
             self.force_video_writer.write(blended_force)
 
-
         return constraint_force
 
 
@@ -201,12 +205,12 @@ if __name__ == "__main__":
     }
 
     force_video_config = {
-        "fps": 20.0,
+        "fps": 30.0,
         "video_type": "mono",
-        "video_path": "/home/md21/heart_experiments/real/processed/20240503_094013.mp4",
-        "start": 100,
-        "end": 450,
-        "save_force": "results/"
+        "video_path": "/home/md21/heart_experiments/real/processed/20240503_095351.mp4",
+        "start": 0,
+        "end": 600,
+        "save_force": "results"
     }
 
     estimator = ForceEstimator(
@@ -219,7 +223,8 @@ if __name__ == "__main__":
     for i in range(force_video_config["start"], force_video_config["end"]):
         idx = i - force_video_config["start"]
         tmp_force = estimator.calculate_force(force_video_config["start"], i, simplify_force=False)
-        # plotting_force[idx] = tmp_force
+        if plot_force:
+            plotting_force[idx] = tmp_force
         # print(f"Force at frame {i}: {tmp_force}")
 
     if estimator.save_force:
@@ -237,9 +242,3 @@ if __name__ == "__main__":
         axs[1].set_ylabel("Force (N)")
         fig.supxlabel("Time (s)")
         plt.show()
-
-    
-    
-
-    
-    

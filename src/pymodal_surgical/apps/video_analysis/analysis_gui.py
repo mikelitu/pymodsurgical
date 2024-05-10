@@ -3,7 +3,7 @@ from PySide6.QtWidgets import QApplication, QLabel, QWidgetAction
 from PySide6.QtWidgets import QVBoxLayout, QWidget, QMdiSubWindow, QMainWindow, QToolBar
 from PySide6.QtGui import QIcon, QAction
 from PySide6.QtMultimedia import QMediaPlayer
-from video_analysis import VideoAnalyzer
+from .video_analysis import VideoAnalyzer
 from pymodal_surgical.apps.utils import ModeShapeCalculator
 
 class VideoAnalysis(QMainWindow):
