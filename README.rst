@@ -27,10 +27,38 @@ The package can be used for the following applications:
 For more information refer to `documentation <src\pymodal_surgical\apps\README.md>`_.
 
 
+Examples
+---------
+
+The package provides a set of examples that demonstrate the usage of the package. The examples are located in the `examples` directory. The examples are:
+
+#. **Liver stereo video**: The example demonstrates the modal analysis of a stereo video of a liver. The example shows how to extract the modal basis of the liver from the video and how to simulate the deformation of the liver using the interactive demo application.
+
+#. **Beating heart video**: The example demonstrates the modal analysis of a video of a beating heart mono video. The example shows how to extract the modal basis of the heart from the video and how to simulate the deformation of the heart using the interactive demo application.
+
+The data for the examples is not included in the repository, but can be downloaded from Google Drive and placed in the `data` directory. To download the data, run the following command in the root directory:
+
+.. code:: sh
+    
+    pip install gdown
+    gdown 'https://drive.google.com/uc?export=downloads&id=1UcIoMHDG3-5va0y7RWRAr54ZSIBuvYUF' -O data.zip
+    unzip data.zip -d data
+    rm data.zip
+
+
 Testing
 --------
 
 This platform has been tested with custom videos and openly available real surgical videos from the Hamlyn Centre Laparoscopic / Endoscopic Video Dataset :ref:`[2]`. The videos are not included in the repository, but can be downloaded from the `official website <https://hamlyn.doc.ic.ac.uk/vision/>`_.
+
+The package has been tested on **Ubuntu 20.04** and **Windows 10** with **Python 3.11**. The package has not been tested on other platforms or Python versions.
+
+
+Docker container
+------------------
+
+Coming soon...
+
 
 References
 -----------
