@@ -30,7 +30,7 @@ For more information refer to `documentation <src\pymodal_surgical\apps\README.m
 Testing
 --------
 
-This platform has been tested with custom videos and openly available real surgical videos from the Hamlyn Centre Laparoscopic / Endoscopic Video Dataset. The videos are not included in the repository, but can be downloaded from the `official website <https://hamlyn.doc.ic.ac.uk/vision/>`_.
+This platform has been tested with custom videos and openly available real surgical videos from the Hamlyn Centre Laparoscopic / Endoscopic Video Dataset :ref:`[2]`. The videos are not included in the repository, but can be downloaded from the `official website <https://hamlyn.doc.ic.ac.uk/vision/>`_.
 
 References
 -----------
