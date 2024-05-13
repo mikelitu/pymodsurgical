@@ -27,9 +27,19 @@ The package can be used for the following applications:
 For more information refer to `documentation <src\pymodal_surgical\apps\README.md>`_.
 
 
+Testing
+--------
+
+This platform has been tested with custom videos and openly available real surgical videos from the Hamlyn Centre Laparoscopic / Endoscopic Video Dataset. The videos are not included in the repository, but can be downloaded from the `official website <https://hamlyn.doc.ic.ac.uk/vision/>`_.
+
 References
 -----------
 .. _[1]:
 
     [1] Davis, Abe, Justin G. Chen, and Frédo Durand. "Image-space modal bases for plausible manipulation 
     of objects in video." ACM Transactions on Graphics (TOG) 34.6 (2015): 1-7.
+
+.. _[2]:
+
+    [2] Peter Mountney, Danail Stoyanov and Guang-Zhong Yang: Three-Dimensional Tissue Deformation Recovery and Tracking: Introducing techniques based on laparoscopic or endoscopic images. IEEE Signal Processing Magazine. 2010 July. Volume: 27. Issue: 4. pp. 14-24.
+    
