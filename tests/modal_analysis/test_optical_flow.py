@@ -32,21 +32,20 @@ class TestOpticalFlow(unittest.TestCase):
     def test_preprocess_for_raft(self):
         # Test case 1: Single batch
         batch = np.random.randn(256, 256, 3)
-        expected_output_shape = (3, 128, 128)
+        expected_output_shape = (3, 256, 256)
         preprocessed_batch = optical_flow.preprocess_for_raft(batch)
         self.assertEqual(preprocessed_batch.shape, expected_output_shape)
         self.assertTrue(isinstance(preprocessed_batch, torch.Tensor))
 
         # Test case 2: Multiple batches
         batch = np.random.randn(2, 256, 256, 3)
-        expected_output_shape = (2, 3, 128, 128)
+        expected_output_shape = (2, 3, 256, 256)
         preprocessed_batch = torch.stack([optical_flow.preprocess_for_raft(b) for b in batch])
         self.assertEqual(preprocessed_batch.shape, expected_output_shape)
         self.assertTrue(isinstance(preprocessed_batch, torch.Tensor))
 
         # Test case 3: Empty batch returns TypeError
         batch = torch.empty(0, 3, 256, 256)
-        expected_output_shape = (0, 3, 128, 128)
         with self.assertRaises(TypeError):
             preprocessed_batch = optical_flow.preprocess_for_raft(batch)
 

@@ -31,13 +31,18 @@ class ModeShapeCalculator():
         self.experiment_dir = Path(f"results/{experiment_name}")
         self.cached = False
 
+        if "batch_size" in config.keys():
+            batch_size = config["batch_size"]
+        else:
+            batch_size = 100
+
         self._load_experiment(config)
         
         if not self.cached:
             if config["video_type"] == "stereo":
-                self.mode_shapes, self.flows = self._calculate_mode_shapes(filter_config=config["filtering"], camera_pos="left")
+                self.mode_shapes, self.flows = self._calculate_mode_shapes(batch_size=batch_size, filter_config=config["filtering"], camera_pos="left")
             else:
-                self.mode_shapes, self.flows = self._calculate_mode_shapes(filter_config=config["filtering"])
+                self.mode_shapes, self.flows = self._calculate_mode_shapes(batch_size=batch_size, filter_config=config["filtering"])
             
             self._save_complex_mode_shapes()
             self._save_rgb_mode_shapes()
@@ -46,9 +51,10 @@ class ModeShapeCalculator():
         self.complex_mode_shapes = mode_shape_2_complex(self.mode_shapes)
         self.frequencies = get_motion_frequencies(len(self.frames), K, 1./config["fps"])
 
+
     def _calculate_mode_shapes(
         self,
-        batch_size: int = 500,
+        batch_size: int = 100,
         filter_config: dict | None = None,
         camera_pos: str | None = None,
         save_flow_video: bool = False,
@@ -56,6 +62,7 @@ class ModeShapeCalculator():
         
         return functions.calculate_mode_shapes(self.frames, self.K, None, batch_size, filter_config, self.mask, camera_pos, save_flow_video)
     
+
     def _load_experiment(
         self,
         config: dict,
@@ -73,7 +80,7 @@ class ModeShapeCalculator():
             mode_shape_dir = self.experiment_dir/"mode_shapes"
             if mode_shape_dir.exists():
                 print(f"Loading cached mode shapes from {mode_shape_dir}")
-                mode_shapes = torch.zeros((len(list(mode_shape_dir.glob("*.png"))), 4, 128, 128))
+                mode_shapes = torch.zeros((len(list(mode_shape_dir.glob("*.png"))), 4, self.frames[0].shape[0], self.frames[0].shape[1]))
                 for file in sorted(mode_shape_dir.glob("*.png")):
                     mode_n = file.stem.split("_")[1]
                     img_mode_shape = Image.open(file)
@@ -92,10 +99,12 @@ class ModeShapeCalculator():
         
         self.K = config["K"]
 
+
     def _calculate_depth(
         self
     ) -> torch.Tensor:
         pass
+    
 
     def _save_complex_mode_shapes(
         self
@@ -108,6 +117,11 @@ class ModeShapeCalculator():
     def _save_rgb_mode_shapes(
         self
     ) -> None:
+        
+        """
+        Save the RGB mode shapes. We follow the same technique as in the pymodal_surgical.modal_analysis.plot_utils.save_complex_mode_shape.
+        We use the utils from torchvision.utils.flow_to_image to convert the complex mode shapes to RGB images.
+        """
         save_path = self.experiment_dir/"rgb_mode_shapes"
         save_path.mkdir(parents=True, exist_ok=True)
         complex_mode_shape = mode_shape_2_complex(self.mode_shapes)
@@ -117,13 +131,21 @@ class ModeShapeCalculator():
             img_mode_shape = torchvision.transforms.functional.to_pil_image(img_mode_shape)
             img_mode_shape.save(save_path/f"mode_{i}.png")
 
+
     def _save_mode_target(
         self
     ) -> None:
+        
+        """
+        Save the mode response of the reference frame.
+        """
+
         save_path = self.experiment_dir/"mode_target"
         save_path.mkdir(parents=True, exist_ok=True)
         complex_mode_shape = mode_shape_2_complex(self.mode_shapes)
-        frame = cv2.resize(self.frames[0], (128, 128))
+
+        # Get the reference frame
+        frame = self.frames[0]
         abs_mode_shapes = torch.abs(complex_mode_shape)
         tensor_frame = torch.from_numpy(frame).permute(2, 0, 1).to(device)
         depth_map = calculate_depth_map(self.depth_model, self.depth_transform, frame, device=device)

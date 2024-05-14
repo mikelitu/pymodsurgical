@@ -54,7 +54,8 @@ try:
 except NameError:
     pass
 
-class ControlType(Enum, str):
+
+class ControlType(str, Enum):
     MOUSE = "mouse"
     HAPTIC = "haptic"
 

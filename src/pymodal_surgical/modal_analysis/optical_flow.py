@@ -99,7 +99,6 @@ def preprocess_for_raft(batch: torch.Tensor):
     tranforms = T.Compose(
         [
             T.ToTensor(),
-            T.Resize((128, 128)),
             T.ConvertImageDtype(torch.float32),
             T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]), # map [0, 1] into [-1, 1]
         ]
@@ -132,7 +131,7 @@ def estimate_flow(
         reference_frame = reference_frames
         target_sequence = target_sequences
         # Upscale the image to the minimum required size for the flow estimator
-        if reference_frame.shape[2] < 128 or reference_frame.shape[3] < 128:
+        if reference_frame.shape[2] % 8 != 0 or reference_frame.shape[3] % 8 != 0:
             in_height, in_width = reference_frame.shape[2], reference_frame.shape[3]
             reference_frame = torch.nn.functional.interpolate(reference_frame, size=(128, 128), mode="bilinear")
             target_sequence = torch.nn.functional.interpolate(target_sequence, size=(128, 128), mode="bilinear")
@@ -143,7 +142,7 @@ def estimate_flow(
         list_of_flows = model(reference_frame, target_sequence)
         
         cur_flows = list_of_flows[-1]
-        if in_height < 128 or in_width < 128:
+        if in_height != reference_frame.shape[2] or in_width != reference_frame.shape[3]:
             flows = torch.nn.functional.interpolate(cur_flows, size=(in_height, in_width), mode="bilinear")
         else:
             flows = cur_flows
