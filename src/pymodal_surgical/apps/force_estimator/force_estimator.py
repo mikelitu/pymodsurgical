@@ -40,8 +40,8 @@ class ForceEstimator():
             force_video_file = force_video_path /"force"/ video_name
             force_video_file.parent.mkdir(parents=True, exist_ok=True)
             width, height = self.force_video_reader.video_width, self.force_video_reader.video_height
-            self.force_video_writer = cv2.VideoWriter(str(force_video_file), cv2.VideoWriter_fourcc(*"mp4v"), force_estimation_config["fps"], (128, 128))
-            self._create_mask(torch.zeros((128, 128)))
+            self.force_video_writer = cv2.VideoWriter(str(force_video_file), cv2.VideoWriter_fourcc(*"mp4v"), force_estimation_config["fps"], (width, height))
+            self._create_mask((height, width))
         else:
             self.save_force = False
             self.force_save_path = None
@@ -58,10 +58,10 @@ class ForceEstimator():
 
     def _create_mask(
         self,
-        frame: np.ndarray,
+        size: tuple[int, int] = (128, 128)
     ) -> None:
         
-        self.force_mask = torch.zeros((2, *frame.shape[:2]), dtype=torch.float32)
+        self.force_mask = torch.zeros((2, *size), dtype=torch.float32)
     
 
     def _blend_frame_with_force(
@@ -71,16 +71,16 @@ class ForceEstimator():
     ) -> np.ndarray:
         
         # force = force.numpy()
-        self.force_mask[:, self.pixels[0][0]:self.pixels[0][1], self.pixels[1][0]:self.pixels[1][1]] = force
+        self.force_mask[:, self.pixels[0][0]:self.pixels[0][1], self.pixels[0][0]:self.pixels[0][1]] = force.transpose(2, 1)
         print(self.force_mask.max(), self.force_mask.min())
         # force_mask = cv2.normalize(self.force_mask, None, 0, 255, cv2.NORM_MINMAX)
         force_mask = flow_to_image(self.force_mask)
         force_mask = force_mask.permute(1, 2, 0).numpy().astype(np.uint8)
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        frame = cv2.resize(frame, (128, 128))
         # force = cv2.applyColorMap(force.astype(np.uint8), cv2.COLORMAP_JET)
         frame = cv2.addWeighted(frame, 0.7, force_mask, 0.3, 0)
         return frame
+
 
     def _blend_quiver_with_frame(
         self,
@@ -88,21 +88,22 @@ class ForceEstimator():
         force: torch.Tensor,
     ) -> np.ndarray:
         
-        gd = 5
-        X, Y = np.mgrid[0:128:gd, 0:128:gd]
+        gd = 10
+        X, Y = np.mgrid[0:frame.shape[0]:gd, 0:frame.shape[1]:gd]
         self.force_mask[:, self.pixels[0][0]:self.pixels[0][1], self.pixels[1][0]:self.pixels[1][1]] = force
         U = self.force_mask[0, ::gd, ::gd].numpy()
         V = self.force_mask[1, ::gd, ::gd].numpy()
 
-        frame = cv2.resize(frame, (128, 128))
+        # frame = cv2.resize(frame, (128, 128))
         # frame_slice = frame[::gd, ::gd]
 
-        figsize = (frame.shape[1] / 10, frame.shape[0] / 10)
-        fig = plt.figure(figsize=figsize, dpi=10)
+        dpi = 100
+        figsize = (frame.shape[1] / dpi, frame.shape[0] / dpi)
+        fig = plt.figure(figsize=figsize, dpi=dpi)
         ax = fig.add_subplot([0, 0, 1, 1])
         ax.imshow(frame, zorder=0, alpha=1.0, interpolation="hermite")
-        rect = patches.Rectangle((self.pixels[1][0], self.pixels[0][0]), self.pixels[1][1] - self.pixels[1][0], self.pixels[0][1] - self.pixels[0][0], linewidth=3, edgecolor="k", facecolor="none")
-        ax.quiver(X, Y, U, V, color="yellow", scale=10)
+        rect = patches.Rectangle((self.pixels[0][0], self.pixels[1][0]), self.pixels[0][1] - self.pixels[0][0], self.pixels[1][1] - self.pixels[1][0], linewidth=2, edgecolor="k", facecolor="none")
+        ax.quiver(X, Y, U, V, color="yellow", scale=50)
         ax.add_patch(rect)
         ax.axis("off")
 
@@ -112,7 +113,7 @@ class ForceEstimator():
         image = np.frombuffer(canvas.tostring_rgb(), dtype="uint8").reshape(int(height), int(width), 3)
         
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-        image = cv2.resize(image, (128, 128))
+        # image = cv2.resize(image, (128, 128))
         # Release the figure resources (important to avoid memory issues)
         plt.close(fig)
 
@@ -207,9 +208,9 @@ if __name__ == "__main__":
     force_video_config = {
         "fps": 30.0,
         "video_type": "mono",
-        "video_path": "/home/md21/heart_experiments/real/processed/20240503_095351.mp4",
+        "video_path": "/home/md21/heart_experiments/real/processed/20240503_094013.mp4",
         "start": 0,
-        "end": 600,
+        "end": 0,
         "save_force": "results"
     }
 
@@ -219,6 +220,9 @@ if __name__ == "__main__":
     )
 
     plotting_force = np.zeros((force_video_config["end"] - force_video_config["start"], 2))
+
+    if force_video_config["end"] == 0:
+        force_video_config["end"] = len(estimator.force_video_reader)
 
     for i in range(force_video_config["start"], force_video_config["end"]):
         idx = i - force_video_config["start"]

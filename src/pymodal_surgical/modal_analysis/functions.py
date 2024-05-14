@@ -13,7 +13,7 @@ def calculate_mode_shapes(
     frames: list[np.ndarray], 
     K: int,
     depth_maps: list[np.ndarray] | None = None,
-    batch_size: int = 50, 
+    batch_size: int = 5, 
     filter_config: dict | None = None,
     mask: Masking | None = None,
     camera_pos: str | None = None,
