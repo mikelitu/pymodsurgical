@@ -26,7 +26,7 @@ class ModeShapeCalculator():
     ) -> None:
         
         video_path = Path(config["video_path"])
-        K = config["K"]
+        self.K = config["K"]
         experiment_name = video_path.stem
         self.experiment_dir = Path(f"results/{experiment_name}")
         self.cached = False
@@ -49,7 +49,7 @@ class ModeShapeCalculator():
             self._save_mode_target()
         
         self.complex_mode_shapes = mode_shape_2_complex(self.mode_shapes)
-        self.frequencies = get_motion_frequencies(len(self.frames), K, 1./config["fps"])
+        self.frequencies = get_motion_frequencies(len(self.frames), self.K, 1./config["fps"])
 
 
     def _calculate_mode_shapes(
@@ -74,31 +74,40 @@ class ModeShapeCalculator():
 
         if config["video_type"] == "stereo":
             self.frames = self.frames[0] # Just keep the left frames
-
-        if self.experiment_dir.exists():
-            print(f"Experiment directory {self.experiment_dir} already exists. Trying to load cached data.")
-            mode_shape_dir = self.experiment_dir/"mode_shapes"
-            if mode_shape_dir.exists():
-                print(f"Loading cached mode shapes from {mode_shape_dir}")
-                mode_shapes = torch.zeros((len(list(mode_shape_dir.glob("*.png"))), 4, self.frames[0].shape[0], self.frames[0].shape[1]))
-                for file in sorted(mode_shape_dir.glob("*.png")):
-                    mode_n = file.stem.split("_")[1]
-                    img_mode_shape = Image.open(file)
-                    tensor_mode_shape = torch.tensor(np.array(img_mode_shape)).permute(2, 0, 1)
-                    mode_shapes[int(mode_n)] = tensor_mode_shape
-                self.cached = True
-                self.mode_shapes = mode_shapes
-                return
         
-        
-        self.depth_model, self.depth_transform = load_depth_model_and_transform(ModelType.DPT_Large, device)
         if config["masking"]["enabled"]:
             self.mask = Masking(config["masking"]["mask"], video_reader.video_type)
+            print(self.mask.mask.shape) 
         else:
             self.mask = None
         
         self.K = config["K"]
 
+        if self.experiment_dir.exists():
+            print(f"Experiment directory {self.experiment_dir} already exists. Trying to load cached data.")
+            mode_shape_dir = self.experiment_dir/"mode_shapes"
+            if mode_shape_dir.exists():
+                
+                if len(list(mode_shape_dir.glob("*.npy"))) == self.K:
+
+                    print(f"Loading cached mode shapes from {mode_shape_dir}")
+                    mode_shapes = torch.zeros((len(list(mode_shape_dir.glob("*.npy"))), 4, self.frames[0].shape[0], self.frames[0].shape[1]))
+                    for file in sorted(mode_shape_dir.glob("*.npy")):
+                        mode_n = file.stem.split("_")[1]
+                        img_mode_shape = np.load(file)
+                        tensor_mode_shape = torch.tensor(img_mode_shape).permute(2, 0, 1)
+                        mode_shapes[int(mode_n)] = tensor_mode_shape
+
+                    self.cached = True
+                    self.mode_shapes = mode_shapes
+                    return
+                
+                else:
+                    print("Cached mode shapes are not complete. Recalculating...")
+        else:
+            print(f"Creating experiment directory {self.experiment_dir}")
+
+        self.depth_model, self.depth_transform = load_depth_model_and_transform(ModelType.DPT_Large, device)
 
     def _calculate_depth(
         self

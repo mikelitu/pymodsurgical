@@ -5,6 +5,7 @@ import json
 import numpy as np
 
 argparser = argparse.ArgumentParser()
+argparser.add_argument("--config", type=str, required=True)
 argparser.add_argument("--force_video_config", type=str, required=True)
 argparser.add_argument("--mode_shape_config", type=str, required=True)
 argparser.add_argument("--output_dir", type=str, required=True)
@@ -28,14 +29,13 @@ def open_config(config_path: str | Path) -> dict:
 
     return config
 
+
 def main():
 
-    force_video_config = open_config(args.force_video_config)
-    mode_shape_config = open_config(args.mode_shape_config)
+    config = open_config(args.config)
 
     estimator = ForceEstimator(
-        force_estimation_config=force_video_config,
-        mode_shape_config=mode_shape_config
+        **config
     )
 
     if args.idx_2 == 0:

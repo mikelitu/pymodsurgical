@@ -5,7 +5,7 @@ from .interactive_demo import InteractiveDemo
 
 def main():
     argparser = argparse.ArgumentParser(description="Run the interactive demo.")
-    argparser.add_argument("--demo-config", type=str, default="liver", help="Name of the demo.")
+    argparser.add_argument("--config", type=str, default="liver", help="Name of the demo.")
     argparser.add_argument("--control", type=str, default="mouse", help="Control method for the demo. Options: 'mouse', 'haptic'")
 
 
@@ -13,7 +13,7 @@ def main():
     args = argparser.parse_args()
 
     # Retrieve the name and control method from the command line arguments
-    config_file = args.demo_config
+    config_file = args.config
     control = args.control
 
     # Load the configuration file

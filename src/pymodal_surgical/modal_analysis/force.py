@@ -61,18 +61,18 @@ def calculate_force_from_displacement_map(
     """
     
     if isinstance(pixel[0], tuple):
-        pix_w = pixel[0]
-        pix_h = pixel[1]
+        pix_h = pixel[0]
+        pix_w = pixel[1]
     
     area = (pix_w[1] - pix_w[0]) * (pix_h[1] - pix_h[0])
     # Calculate the motion compensation matrix
     S = calculate_motion_compensation_matrix(frequencies, timestep, alpha, beta)
     modal_coordinate = modal_coordinate.reshape(-1, 2, 1)
     
-    displacement_vector = displacement_map[:, pix_w[0]:pix_w[1], pix_h[0]:pix_h[1]]
+    displacement_vector = displacement_map[:, pix_h[0]:pix_h[1], pix_w[0]:pix_w[1]]
 
     force_sign = torch.sign(displacement_vector).squeeze(-1)
-    pixel_mode_shape = mode_shape[:, :, pix_w[0]:pix_w[1], pix_h[0]:pix_h[1]]
+    pixel_mode_shape = mode_shape[:, :, pix_h[0]:pix_h[1], pix_w[0]:pix_w[1]]
     trans_pixel_mode_shape = pixel_mode_shape.transpose(2, 3)
     mode_shape_mult = pixel_mode_shape * S.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1) @ trans_pixel_mode_shape
     inv_mode_shape_mult = mode_shape_mult.pinverse()
@@ -95,4 +95,4 @@ def calculate_force_from_displacement_map(
     if simplify_force:
         force = force.mean(dim=1).mean(dim=1)
 
-    return force / area
+    return force

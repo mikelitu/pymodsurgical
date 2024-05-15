@@ -9,6 +9,7 @@ from pymodal_surgical.video_processing.masking import Masking
 import math
 import numpy as np
 from enum import Enum
+from pymodal_surgical.apps.utils import ModeShapeCalculator
 
 try:
     from dataclasses import dataclass, field
@@ -19,8 +20,6 @@ except OSError:
     pass
 
 import time
-import argparse
-import json
 
 
 rad = math.pi / 180
@@ -64,20 +63,14 @@ class InteractiveDemo(object):
     
     def __init__(
         self,
-        video_path: PosixPath | str,
-        solver_time_step: float = 0.03,
-        fps: int = 24,
-        start: int = 0,
-        end: int = 0,
-        K: int = 16,
+        mode_shape_config: dict,
+        solver_time_step: float = 0.01,
         depth_model_type: depth.ModelType | str = depth.ModelType.DPT_Large,
         control_type: str = ControlType.MOUSE,
         norm_scale: float = 10.0,
         alpha_limit: float = 5.0,
         force_scale: float = 0.35,
         display_cropping: tuple[int, int] = (30, 30),
-        filtering: bool = True,
-        masking: bool = True,
         near: float = 0.05,
         far: float = 0.95,
         mass: float = 1.0,
@@ -87,20 +80,28 @@ class InteractiveDemo(object):
         rayleigh_stiffness: float = 0.5
     ) -> None:
 
-        frames = self._init_video_reader(video_path, start, end)
-        
-        if isinstance(frames, tuple):
-            self.reference_frame = self.video_reader.read_frame(0)[0]
-        else:
-            self.reference_frame = self.video_reader.read_frame(0)
+
+        fps = mode_shape_config["fps"]
+
+        mode_shape_calculator = ModeShapeCalculator(mode_shape_config)
+        self.mode_shapes = mode_shape_calculator.complex_mode_shapes
+        print(self.mode_shapes.shape)
+        self.frequencies = mode_shape_calculator.frequencies
+        self.reference_frame = mode_shape_calculator.frames[0]
 
         self.depth_map = self._get_depth_map(self.reference_frame, depth_model_type)
         self.near, self.far = near, far
         self.inverse = inverse
+
+        if mode_shape_calculator.mask is not None:
+            self.mask = mode_shape_calculator.mask.masking
+        else:
+            self.mask = None
+
         # Normalize depth map for depth culling
         self.depth_map = (self.depth_map - self.depth_map.min()) / (self.depth_map.max() - self.depth_map.min())
         display_frame = depth.apply_depth_culling(self.depth_map[0], self.reference_frame, self.near, self.far, self.inverse)
-        self._get_mode_shapes_from_video(frames, K, filtering, masking)
+        
         self._control_func = {ControlType.MOUSE: self.mouse_control, ControlType.HAPTIC: self.haptic_control}[control_type]
         self.control_type = control_type
         if control_type == ControlType.HAPTIC:
@@ -114,8 +115,6 @@ class InteractiveDemo(object):
         self._init_pygame(display_frame)
         self.alpha_limit = alpha_limit
         self.norm_scale = norm_scale
-        timesteps = len(frames[0]) if isinstance(frames, tuple) else len(frames)
-        self.frequencies = motion.get_motion_frequencies(timesteps, K, 1 / fps)
         self.solve = False
         self.fps = fps
         self.solver_time_step = solver_time_step
@@ -358,7 +357,8 @@ class InteractiveDemo(object):
                 deformation_map, _ = deformation.calculate_deformation_map_from_displacement(self.mode_shapes[0], -self.displacement, self.pixel, self.alpha)
             else:
                 deformation_map, _ = deformation.calculate_deformation_map_from_displacement(self.mode_shapes, -self.displacement, self.pixel, self.alpha)
-            
+        
+
             deformed_frame = optical_flow.warp_flow(torch.from_numpy(self.reference_frame).permute(2, 0, 1).float().to(device), deformation_map.to(device), self.depth_map, self.mask, self.near, self.far, self.inverse)
             deformed_frame = self._crop_image_for_display(deformed_frame, (self.reference_frame.shape[0] - self.display_cropping[0], self.reference_frame.shape[1] - self.display_cropping[1]))
             deformed_frame_surf = pygame.transform.rotate(pygame.transform.flip(pygame.surfarray.make_surface(deformed_frame), False, True), -90)
@@ -377,35 +377,7 @@ class InteractiveDemo(object):
             self.screen.blit(self.image, (0, 0))
         
         cursor(self.screen, (255, 255, 255), self.cur_pos, 10)
-    
 
-    def _init_masking(
-        self
-    ) -> Masking:
-        """
-        Initialize the mask for the video.
-        """
-        return Masking(self.video_reader.video_config[self.video_reader.video_path.stem]["mask"], self.video_reader.video_type)
-    
-
-    def _init_video_reader(
-        self,
-        video_config: PosixPath | str,
-        start: int,
-        end: int
-    ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
-        """
-        Initialize the video reader and read the frames.
-        """
-
-        video_path = video_config["video_path"]
-
-        if isinstance(video_path, str):
-            video_path = Path(video_path)
-        
-        self.video_reader = VideoReader(video_config, return_type=RetType.NUMPY)
-        return self.video_reader.read(start, end)
-    
 
     def _get_depth_map(
         self,
@@ -421,31 +393,6 @@ class InteractiveDemo(object):
         depth_map = depth.calculate_depth_map(model, transform, reference_frame, device)
         return depth_map
 
-
-    def _get_mode_shapes_from_video(
-        self,
-        frames: np.ndarray | tuple[np.ndarray, np.ndarray],
-        K: int,
-        filtering: bool,
-        masking: bool
-    ) -> None:
-        """
-        Get the mode shapesfrom the video frames.
-        """
-        if masking:
-            mask = self._init_masking()
-            self.mask = mask.masking
-        else:
-            mask = None
-            self.mask = None
-        if isinstance(frames, tuple):
-            mode_shapes = (functions.calculate_mode_shapes(frames[0], K, filtered=filtering, mask=mask, camera_pos="left", save_flow_video=False), functions.calculate_mode_shapes(frames[1], K, filtered=filtering, mask=mask, camera_pos="right"))
-            mode_shapes = functions.resize_spectrum_2_reference(mode_shapes, self.reference_frame)
-            self.mode_shapes, _ = math_helper.mode_shape_2_complex(mode_shapes)
-        else:
-            mode_shapes = functions.calculate_mode_shapes(frames, K, filtered=filtering, mask=mask)
-            self.mode_shapes = math_helper.mode_shape_2_complex(functions.resize_spectrum_2_reference(mode_shapes, self.reference_frame)) 
-    
 
     def _crop_image_for_display(
         self,

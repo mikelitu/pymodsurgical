@@ -40,12 +40,14 @@ class ForceEstimator():
             force_video_file = force_video_path /"force"/ video_name
             force_video_file.parent.mkdir(parents=True, exist_ok=True)
             width, height = self.force_video_reader.video_width, self.force_video_reader.video_height
-            self.force_video_writer = cv2.VideoWriter(str(force_video_file), cv2.VideoWriter_fourcc(*"mp4v"), force_estimation_config["fps"], (width, height))
+            self.force_video_writer = cv2.VideoWriter(str(force_video_file), cv2.VideoWriter_fourcc(*"mp4v"), force_estimation_config["fps"], (height, width))
             self._create_mask((height, width))
+        
         else:
             self.save_force = False
             self.force_save_path = None
 
+    
     def _load_force_video(
         self,
         force_estimation_config: dict
@@ -88,7 +90,7 @@ class ForceEstimator():
         force: torch.Tensor,
     ) -> np.ndarray:
         
-        gd = 10
+        gd = 20
         X, Y = np.mgrid[0:frame.shape[0]:gd, 0:frame.shape[1]:gd]
         self.force_mask[:, self.pixels[0][0]:self.pixels[0][1], self.pixels[1][0]:self.pixels[1][1]] = force
         U = self.force_mask[0, ::gd, ::gd].numpy()
@@ -98,12 +100,13 @@ class ForceEstimator():
         # frame_slice = frame[::gd, ::gd]
 
         dpi = 100
-        figsize = (frame.shape[1] / dpi, frame.shape[0] / dpi)
+        figsize = (frame.shape[0] / dpi, frame.shape[1] / dpi)
         fig = plt.figure(figsize=figsize, dpi=dpi)
         ax = fig.add_subplot([0, 0, 1, 1])
         ax.imshow(frame, zorder=0, alpha=1.0, interpolation="hermite")
-        rect = patches.Rectangle((self.pixels[0][0], self.pixels[1][0]), self.pixels[0][1] - self.pixels[0][0], self.pixels[1][1] - self.pixels[1][0], linewidth=2, edgecolor="k", facecolor="none")
-        ax.quiver(X, Y, U, V, color="yellow", scale=50)
+        rec_limits = (self.pixels[0][0] + 10, self.pixels[0][1] + 10, self.pixels[1][0] + 10, self.pixels[1][1] + 10)
+        rect = patches.Rectangle((rec_limits[0], rec_limits[2]), rec_limits[1] - rec_limits[0], rec_limits[3] - rec_limits[2], linewidth=2, edgecolor="k", facecolor="none")
+        ax.quiver(X, Y, U, V, color="yellow", scale=25)
         ax.add_patch(rect)
         ax.axis("off")
 
@@ -118,6 +121,7 @@ class ForceEstimator():
         plt.close(fig)
 
         return image
+
 
     def _show_frames(
         self,
@@ -153,7 +157,7 @@ class ForceEstimator():
             roi = self._select_roi(frame_1)
             pix_w = (roi[1], roi[1] + roi[3])
             pix_h = (roi[0], roi[0] + roi[2])
-            self.pixels = (pix_w, pix_h)
+            self.pixels = (pix_h, pix_w)
 
         # Preprocess the frames for the calculation of optical flow
         processed_frame_1 = optical_flow.preprocess_for_raft(frame_1).unsqueeze(0).to(device)
@@ -161,7 +165,8 @@ class ForceEstimator():
 
         # Calculate the optical flow
         flow = optical_flow.estimate_flow(self.flow_model, processed_frame_1, processed_frame_2)
-        flow = flow.squeeze(0).detach().cpu()
+        norm_flow = flow / flow.norm(dim=1, keepdim=True)
+        flow = norm_flow.squeeze(0).detach().cpu()
 
         # The optical flow corresponds to the desired displacement of the pixels
         # We need to calculate the force that is applied to the pixels
@@ -178,6 +183,9 @@ class ForceEstimator():
             if simplify_force:
                 raise ValueError("Cannot save simplified force to plot as a video grid")
             
+            # Normalized force for display
+            constraint_force = constraint_force / constraint_force.norm(dim=0, keepdim=True)
+
             blended_force = self._blend_quiver_with_frame(frame_2, constraint_force)
             self.force_video_writer.write(blended_force)
 
@@ -190,7 +198,7 @@ if __name__ == "__main__":
     mode_shape_config = {
         "video_path": "/home/md21/heart_experiments/real/processed/20240503_094013.mp4",
         "K": 16,
-        "fps": 20.0,
+        "fps": 30.0,
         "video_type": "mono",
         "start": 0,
         "end": 0,
@@ -208,9 +216,9 @@ if __name__ == "__main__":
     force_video_config = {
         "fps": 30.0,
         "video_type": "mono",
-        "video_path": "/home/md21/heart_experiments/real/processed/20240503_094013.mp4",
+        "video_path": "/home/md21/heart_experiments/real/processed/20240503_095351.mp4",
         "start": 0,
-        "end": 0,
+        "end": 600,
         "save_force": "results"
     }
 
@@ -221,12 +229,12 @@ if __name__ == "__main__":
 
     plotting_force = np.zeros((force_video_config["end"] - force_video_config["start"], 2))
 
-    if force_video_config["end"] == 0:
+    if force_video_config["end"] == 0 or force_video_config["end"] > len(estimator.force_video_reader):
         force_video_config["end"] = len(estimator.force_video_reader)
 
     for i in range(force_video_config["start"], force_video_config["end"]):
         idx = i - force_video_config["start"]
-        tmp_force = estimator.calculate_force(force_video_config["start"], i, simplify_force=False)
+        tmp_force = estimator.calculate_force(i-1, i, simplify_force=False)
         if plot_force:
             plotting_force[idx] = tmp_force
         # print(f"Force at frame {i}: {tmp_force}")

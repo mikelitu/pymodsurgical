@@ -50,7 +50,7 @@ class Masking(object):
         if self.video_type == VideoType.STEREO:
             self._check_stereo(camera_pos)
         
-        if isinstance(frames, torch.Tensor):
+        if self.video_type == VideoType.STEREO:
             self.mask = torch.from_numpy(self.mask).to(frames.device) if not isinstance(self.mask, torch.Tensor) else self.mask
             if self.width != frames.shape[3] or self.height != frames.shape[2]:
                 self.mask = F.interpolate(self.mask[None, None, ...], (frames.shape[2], frames.shape[3]), mode="nearest")[0, 0]

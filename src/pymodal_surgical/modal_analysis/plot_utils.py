@@ -184,9 +184,10 @@ def save_complex_mode_shape(
     else:
         for i in range(mode_shapes.shape[0]):
             mode_shape = mode_shapes[i]
-            filename = f"mode_{i}.png"
+            filename = f"mode_{i}.npy"
             tmp_save_dir = utils.create_save_dir(save_dir, filename)
             np_mode_shape = mode_shape.detach().cpu().permute(1, 2, 0).numpy()
-            img_mode_shape = Image.fromarray(np_mode_shape, "RGBA")
-            img_mode_shape.save(tmp_save_dir)
+            np.save(tmp_save_dir, np_mode_shape)
+            # img_mode_shape = Image.fromarray(np_mode_shape, "RGBA")
+            # img_mode_shape.save(tmp_save_dir)
 
