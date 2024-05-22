@@ -44,10 +44,11 @@ class ModeShapeCalculator():
             else:
                 self.mode_shapes, self.flows = self._calculate_mode_shapes(batch_size=batch_size, filter_config=config["filtering"])
             
-            self._save_complex_mode_shapes()
-            self._save_rgb_mode_shapes()
-            self._save_mode_target()
-        
+            if config["save_mode_shapes"]:
+                self._save_complex_mode_shapes()
+                self._save_rgb_mode_shapes()
+                self._save_mode_target()
+            
         self.complex_mode_shapes = mode_shape_2_complex(self.mode_shapes)
         self.frequencies = get_motion_frequencies(len(self.frames), self.K, 1./config["fps"])
 

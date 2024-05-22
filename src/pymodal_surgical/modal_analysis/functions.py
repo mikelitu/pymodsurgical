@@ -37,10 +37,10 @@ def calculate_mode_shapes(
     """
     
     preprocess_frames = [optical_flow.preprocess_for_raft(frame) for frame in frames]
-    preprocess_frames = torch.stack(preprocess_frames).to(device)
+    preprocess_frames = torch.stack(preprocess_frames)
 
     B = preprocess_frames.shape[0]
-    flows = torch.zeros((B - 1, 2, preprocess_frames.shape[2], preprocess_frames.shape[3])).to(device)
+    flows = torch.zeros((B - 1, 2, preprocess_frames.shape[2], preprocess_frames.shape[3]))
 
     reference_frames = preprocess_frames[:-1]
     target_frames = preprocess_frames[1:]
@@ -50,9 +50,9 @@ def calculate_mode_shapes(
         for i in range(number_of_batches):
             start = i * batch_size
             end = (i + 1) * batch_size
-            flows[start:end] = optical_flow.estimate_flow(model, reference_frames[start:end], target_frames[start:end]).squeeze(0)
+            flows[start:end] = optical_flow.estimate_flow(model, reference_frames[start:end].to(device), target_frames[start:end].to(device)).squeeze(0).detach().cpu()
     else:
-        flows = optical_flow.estimate_flow(model, reference_frames, target_frames).squeeze(0)
+        flows = optical_flow.estimate_flow(model, reference_frames.to(device), target_frames.to(device)).squeeze(0)
 
     if filter_config is not None:
         if filter_config["enabled"]:
