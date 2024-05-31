@@ -81,9 +81,10 @@ class InteractiveDemo(object):
     ) -> None:
 
 
-        fps = mode_shape_config["fps"]
+        
 
         mode_shape_calculator = ModeShapeCalculator(mode_shape_config)
+        fps = mode_shape_calculator.fps
         self.mode_shapes = mode_shape_calculator.complex_mode_shapes
         print(self.mode_shapes.shape)
         self.frequencies = mode_shape_calculator.frequencies

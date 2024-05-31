@@ -50,7 +50,7 @@ class ModeShapeCalculator():
                 self._save_mode_target()
             
         self.complex_mode_shapes = mode_shape_2_complex(self.mode_shapes)
-        self.frequencies = get_motion_frequencies(len(self.frames), self.K, 1./config["fps"])
+        self.frequencies = get_motion_frequencies(len(self.frames), self.K, 1./self.fps)
 
 
     def _calculate_mode_shapes(
@@ -70,6 +70,7 @@ class ModeShapeCalculator():
     ) -> None:
         
         video_reader = VideoReader(config)
+        self.fps = video_reader.fps
 
         self.frames = video_reader.read(int(config["start"]), int(config["end"]))
 
@@ -78,7 +79,6 @@ class ModeShapeCalculator():
         
         if config["masking"]["enabled"]:
             self.mask = Masking(config["masking"]["mask"], video_reader.video_type)
-            print(self.mask.mask.shape) 
         else:
             self.mask = None
         
@@ -163,6 +163,9 @@ class ModeShapeCalculator():
         for i in range(abs_mode_shapes.shape[0]):
             increased_mode_shape = abs_mode_shapes[i] * 10.
             increased_mode_shape = increased_mode_shape.to(device)
-            target_mode_shape = warp_flow(tensor_frame, increased_mode_shape, depth_map=depth_map, mask=self.mask.mask.cpu().numpy(), near=0.0, far=1.0)
+            mask = self.mask.mask
+            if isinstance(mask, torch.Tensor):
+                mask = mask.cpu().numpy()
+            target_mode_shape = warp_flow(tensor_frame, increased_mode_shape, depth_map=depth_map, mask=mask, near=0.0, far=1.0)
             img_mode_shape = Image.fromarray(target_mode_shape)
             img_mode_shape.save(save_path/f"mode_{i}.png")

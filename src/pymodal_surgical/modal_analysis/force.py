@@ -93,6 +93,9 @@ def calculate_force_from_displacement_map(
     force = force_sign * force
     
     if simplify_force:
-        force = force.mean(dim=1).mean(dim=1)
+        force = force.sum(dim=1).sum(dim=1) / area
+    
+    else:
+        force = (force - force.mean(dim=0)) / (force.std(dim=0) + torch.finfo(torch.float32).eps)
 
     return force

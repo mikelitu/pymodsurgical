@@ -13,9 +13,10 @@ import cv2
 from pymodal_surgical.utils import create_save_dir
 from torchvision.utils import flow_to_image
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-
+from pymodal_surgical.video_processing.filtering import GaussianFiltering
 
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+
 
 class ForceEstimator():
 
@@ -29,7 +30,10 @@ class ForceEstimator():
 
         self.mode_shapes = mode_shape_calculator.complex_mode_shapes
         self.frequencies = mode_shape_calculator.frequencies
+        self.fps = mode_shape_calculator.fps
         self._load_force_video(force_estimation_config)
+
+        self.filter = GaussianFiltering(15, 3.0)
 
 
         if "save_force" in force_estimation_config.keys() and force_estimation_config["save_force"] != "":
@@ -40,7 +44,7 @@ class ForceEstimator():
             force_video_file = force_video_path /"force"/ video_name
             force_video_file.parent.mkdir(parents=True, exist_ok=True)
             width, height = self.force_video_reader.video_width, self.force_video_reader.video_height
-            self.force_video_writer = cv2.VideoWriter(str(force_video_file), cv2.VideoWriter_fourcc(*"mp4v"), force_estimation_config["fps"], (height, width))
+            self.force_video_writer = cv2.VideoWriter(str(force_video_file), cv2.VideoWriter_fourcc(*"mp4v"), self.fps, (height, width))
             self._create_mask((height, width))
         
         else:
@@ -55,7 +59,11 @@ class ForceEstimator():
         
         self.force_video_reader = VideoReader(video_config=force_estimation_config)
         self.flow_model = optical_flow.load_flow_model(device)
-        self.pixels = None
+        
+        if "pixels" in force_estimation_config.keys() and force_estimation_config["pixels"] is not None:
+            self.pixels = force_estimation_config["pixels"]
+        else:
+            self.pixels = None
 
 
     def _create_mask(
@@ -73,7 +81,7 @@ class ForceEstimator():
     ) -> np.ndarray:
         
         # force = force.numpy()
-        self.force_mask[:, self.pixels[0][0]:self.pixels[0][1], self.pixels[0][0]:self.pixels[0][1]] = force.transpose(2, 1)
+        self.force_mask[:, self.pixels[0][0]:self.pixels[0][1], self.pixels[1][0]:self.pixels[1][1]] = force.transpose(2, 1)
         print(self.force_mask.max(), self.force_mask.min())
         # force_mask = cv2.normalize(self.force_mask, None, 0, 255, cv2.NORM_MINMAX)
         force_mask = flow_to_image(self.force_mask)
@@ -158,6 +166,7 @@ class ForceEstimator():
             pix_w = (roi[1], roi[1] + roi[3])
             pix_h = (roi[0], roi[0] + roi[2])
             self.pixels = (pix_h, pix_w)
+            print(f"Selected ROI: {self.pixels}")
 
         # Preprocess the frames for the calculation of optical flow
         processed_frame_1 = optical_flow.preprocess_for_raft(frame_1).unsqueeze(0).to(device)
@@ -165,8 +174,11 @@ class ForceEstimator():
 
         # Calculate the optical flow
         flow = optical_flow.estimate_flow(self.flow_model, processed_frame_1, processed_frame_2)
-        norm_flow = flow / flow.norm(dim=1, keepdim=True)
-        flow = norm_flow.squeeze(0).detach().cpu()
+        
+        # flow = self.filter(processed_frame_2, flow.detach().cpu())
+        flow = flow.squeeze(0).detach().cpu()
+        # norm_flow = flow / flow.norm(dim=1, keepdim=True)
+        # flow = norm_flow.squeeze(0).detach().cpu()
 
         # The optical flow corresponds to the desired displacement of the pixels
         # We need to calculate the force that is applied to the pixels
@@ -184,7 +196,7 @@ class ForceEstimator():
                 raise ValueError("Cannot save simplified force to plot as a video grid")
             
             # Normalized force for display
-            constraint_force = constraint_force / constraint_force.norm(dim=0, keepdim=True)
+            # constraint_force = constraint_force / constraint_force.norm(dim=0, keepdim=True)
 
             blended_force = self._blend_quiver_with_frame(frame_2, constraint_force)
             self.force_video_writer.write(blended_force)
@@ -193,64 +205,108 @@ class ForceEstimator():
 
 
 if __name__ == "__main__":
-    plot_force = False
-
-    mode_shape_config = {
-        "video_path": "/home/md21/heart_experiments/real/processed/20240503_094013.mp4",
-        "K": 16,
-        "fps": 30.0,
-        "video_type": "mono",
-        "start": 0,
-        "end": 0,
-        "masking": {
-            "enabled": True,
-            "mask": "/home/md21/heart_experiments/real/processed/mask.png"
-        },
-        "filtering": {
-            "enabled": True,
-            "size": 13,
-            "sigma": 3.0
-        }
-    }
-
-    force_video_config = {
-        "fps": 30.0,
-        "video_type": "mono",
-        "video_path": "/home/md21/heart_experiments/real/processed/20240503_095351.mp4",
-        "start": 0,
-        "end": 600,
-        "save_force": "results"
-    }
-
-    estimator = ForceEstimator(
-        force_estimation_config=force_video_config,
-        mode_shape_config=mode_shape_config
-    )
-
-    plotting_force = np.zeros((force_video_config["end"] - force_video_config["start"], 2))
-
-    if force_video_config["end"] == 0 or force_video_config["end"] > len(estimator.force_video_reader):
-        force_video_config["end"] = len(estimator.force_video_reader)
-
-    for i in range(force_video_config["start"], force_video_config["end"]):
-        idx = i - force_video_config["start"]
-        tmp_force = estimator.calculate_force(i-1, i, simplify_force=False)
-        if plot_force:
-            plotting_force[idx] = tmp_force
-        # print(f"Force at frame {i}: {tmp_force}")
-
-    if estimator.save_force:
-        estimator.force_video_writer.release()
-        cv2.destroyAllWindows()
     
+    plot_force = False
+    plot_dict = {}
+    pixels = None
+
+    for K in [16]:
+
+        mode_shape_config = {
+                "video_path": "/home/md21/heart_experiments/phantom/processed/20240501_042319.mp4",
+                "K": K,
+                "video_type": "mono",
+                "start": 0,
+                "end": 120,
+                "batch_size": 2,
+                "masking": {
+                    "enabled": True,
+                    "mask": "/home/md21/heart_experiments/phantom/mask.png"
+                },
+                "filtering": {
+                    "enabled": True,
+                    "size": 15,
+                    "sigma": 2.0
+                },
+
+                "save_mode_shapes": True,
+            }
+
+
+        if K == 4:
+            
+            force_video_config = {
+                "video_type": "mono",
+                "video_path": "/home/md21/heart_experiments/phantom/processed/20240501_033343.mp4",
+                "start": 0,
+                "end": 0,
+
+            }
+        
+        else:
+
+            force_video_config = {
+                "video_type": "mono",
+                "video_path": "/home/md21/heart_experiments/phantom/processed/20240501_033343.mp4",
+                "start": 0,
+                "end": 0,
+                "pixels": pixels,
+                "save_force": "results"
+            }
+
+        estimator = ForceEstimator(
+            force_estimation_config=force_video_config,
+            mode_shape_config=mode_shape_config
+        )
+
+
+        if force_video_config["end"] == 0 or force_video_config["end"] > len(estimator.force_video_reader):
+            force_video_config["end"] = len(estimator.force_video_reader)
+
+        plotting_force = np.zeros((force_video_config["end"] - force_video_config["start"], 2))
+
+        for i in range(force_video_config["start"], force_video_config["end"]):
+            idx = i - force_video_config["start"]
+
+            tmp_force = estimator.calculate_force(force_video_config["start"], i, simplify_force=plot_force)
+            
+            if idx == 0 and K == 4:
+                pixels = estimator.pixels
+
+            if plot_force:
+                plotting_force[idx] = tmp_force / K
+            # print(f"Force at frame {i}: {tmp_force}")
+
+        if estimator.save_force:
+            estimator.force_video_writer.release()
+            cv2.destroyAllWindows()
+        
+        plot_dict[K] = plotting_force
+    
+
     if plot_force:
-        fig, axs = plt.subplots(2, 1, figsize=(10, 10), sharex=True)
-        time = (1/force_video_config["fps"]) * np.arange(force_video_config["start"], force_video_config["end"])
-        axs[0].plot(time, plotting_force[:, 0])
-        axs[0].set_title("U-Direction Force")
-        axs[0].set_ylabel("Force (N)")
-        axs[1].plot(time, plotting_force[:, 1])
-        axs[1].set_title("V-Direction Force")
-        axs[1].set_ylabel("Force (N)")
-        fig.supxlabel("Time (s)")
+        dpi = 100
+        # plotting_force = (plotting_force - plotting_force.min()) / (plotting_force.max() - plotting_force.min())
+        real_data = np.load("experiments/phantom/2024-05-01_03-34-27/force.npy")
+        real_data = (real_data - real_data.mean(axis=0)) / real_data.std(axis=0)
+        # real_data = (real_data - real_data.min(axis=0)) / (real_data.max(axis=0) - real_data.min(axis=0) + 1e-6)
+        plot_real_data = real_data[1200:]
+        real_time = (1/240) * np.arange(0, plot_real_data.shape[0], 1)
+        plt.rcParams.update({'font.size': 22, 'font.family': 'serif', 'font.serif': 'Times New Roman'})
+        fig, axs = plt.subplots(2, 1, figsize=(1920 / dpi, 1080 / dpi), dpi = dpi, sharex=True)
+        fig.supxlabel("Time (s)", fontweight="bold")
+        fig.supylabel("Force", fontweight="bold")
+        time = (1/estimator.fps) * np.arange(force_video_config["start"], force_video_config["end"])
+        
+        for K, plotting_force in plot_dict.items():
+            # plotting_force = (plotting_force - plotting_force.min(axis=0)) / (plotting_force.max(axis=0) - plotting_force.min(axis=0) + 1e-6)
+            plotting_force = (plotting_force - plotting_force.mean(axis=0)) / plotting_force.std(axis=0)
+            axs[0].plot(time, plotting_force[:, 0], "--", linewidth=3.0, color="#8cc5e3")
+            axs[0].plot(real_time, -plot_real_data[:, 2], linewidth=3.0, color="#f0b077")
+            axs[0].set_ylabel("u")
+            axs[1].plot(time, plotting_force[:, 1], "--", linewidth=3.0, color="#8cc5e3")
+            axs[1].plot(real_time, plot_real_data[:, 1], linewidth=3.0, color="#f0b077")
+            axs[1].set_ylabel("v")
+        
+        fig.legend([f"K={K}" for K in plot_dict.keys()] + ["Force Sensor"], loc="upper right")
         plt.show()

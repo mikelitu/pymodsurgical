@@ -5,7 +5,7 @@ from .interactive_demo import InteractiveDemo
 
 def main():
     argparser = argparse.ArgumentParser(description="Run the interactive demo.")
-    argparser.add_argument("--config", type=str, default="liver", help="Name of the demo.")
+    argparser.add_argument("--config", type=str, required=True, help="Configuration file for the demo")
     argparser.add_argument("--control", type=str, default="mouse", help="Control method for the demo. Options: 'mouse', 'haptic'")
 
 
@@ -18,8 +18,11 @@ def main():
 
     # Load the configuration file
     config_file = Path(config_file)
-    with open(config_file) as f:
-        demo_config = json.load(f)
+    try:
+        with open(config_file) as f:
+            demo_config = json.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Configuration file {config_file} not found. Please provide a valid configuration file.")
 
     # Create an instance of the InteractiveDemo class
     demo = InteractiveDemo(control_type=control, **demo_config)
