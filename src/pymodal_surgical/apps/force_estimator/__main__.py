@@ -6,12 +6,7 @@ import numpy as np
 
 argparser = argparse.ArgumentParser()
 argparser.add_argument("--config", type=str, required=True)
-argparser.add_argument("--force_video_config", type=str, required=True)
-argparser.add_argument("--mode_shape_config", type=str, required=True)
-argparser.add_argument("--output_dir", type=str, required=True)
-argparser.add_argument("--idx_1", type=int, help="Index of the first frame", default=0)
-argparser.add_argument("--idx_2", type=int, help="Index of the second frame", default=0)
-argparser.add_argument("--plot", action="store_true", help="Flag to plot the force data", default=False)
+argparser.add_argument("--plot", action="store_true", help="Plot the force data")
 
 args = argparser.parse_args()
 
@@ -29,10 +24,24 @@ def open_config(config_path: str | Path) -> dict:
 
     return config
 
+def check_mode(config: dict):
+    force_mode = config["force_estimation_config"]["mode"]
+    if force_mode not in ["simple", "texture"]:
+        raise ValueError(f"Invalid mode {force_mode}. Options are 'simple' and 'texture'")
+    
+    return force_mode
+
 
 def main():
 
+    if not args.config:
+        raise ValueError("Config file not provided")
+    
+
+
     config = open_config(args.config)
+
+    force_mode = check_mode(config)
 
     estimator = ForceEstimator(
         **config
@@ -52,6 +61,11 @@ def main():
     force.save(output_dir / f"force_{args.idx_1}_{args.idx_2}.npy")
 
     if args.plot:
+        if force_mode != "simple":
+            raise ValueError("Cannot plot force data for texture mode")
+        
+        forces = (forces - forces.mean(axis=0)) / (forces.std(axis=0) + 1e-6)
+        
         import matplotlib.pyplot as plt
         fig, axs = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
         time = (1/30) * np.arange(0, forces.shape[0], 1)
@@ -59,7 +73,7 @@ def main():
             axs[i].plot(time, forces[:, i])
         
         fig.supxlabel("Time (s)")
-        fig.supylabel("Force")
+        fig.supylabel("Normalized Force")
         plt.show()
 
 if __name__ == "__main__":
