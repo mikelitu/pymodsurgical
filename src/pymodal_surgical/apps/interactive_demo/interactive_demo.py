@@ -2,9 +2,7 @@ import pygame
 
 from pymodal_surgical.modal_analysis import deformation, math_helper, optical_flow, motion, depth, solver
 from pymodal_surgical.modal_analysis import functions
-from pymodal_surgical.video_processing.reader import VideoReader, RetType
 import torch
-from pathlib import Path, PosixPath
 from pymodal_surgical.video_processing.masking import Masking
 import math
 import numpy as np
@@ -16,7 +14,8 @@ try:
     from pyOpenHaptics.hd_device import HapticDevice
     import pyOpenHaptics.hd as hd
     from pyOpenHaptics.hd_callback import hd_callback
-except OSError:
+except OSError as e:
+    print(e)
     pass
 
 import time
@@ -107,7 +106,7 @@ class InteractiveDemo(object):
         self.control_type = control_type
         if control_type == ControlType.HAPTIC:
             self._init_haptic_device()
-            self.haptic_limits = torch.tensor([[-210.0, 216.0], [27.7, 330.0]])
+            self.haptic_limits = torch.tensor([[-145.0, 48.0], [19.06, 175.0]])
             self.force_limits = torch.tensor([[-1.0, 1.0], [-1.0, 1.0]]) 
             self.force_scale = force_scale
         
@@ -161,7 +160,7 @@ class InteractiveDemo(object):
         # Let the callback run for a bit to get the initial state of the device
         time.sleep(0.1)
         # Start a loop so the user sets the desired intial position
-        print("Set the initial position of the device. Move the device to the following position: [0., 175.]")
+        print("Set the initial position of the device.")
         
         precision_range = 1.0
         self.backoff_count = 0
@@ -169,8 +168,8 @@ class InteractiveDemo(object):
         try:
             while True:
                 print("Current position: ", device_state.position[:2])
-                diff_x = abs(device_state.position[0] + 0)
-                diff_y = abs(device_state.position[1] - 175.0)
+                diff_x = abs(device_state.position[0] + 45.0)
+                diff_y = abs(device_state.position[1] - 78.0)
                 if diff_x < precision_range and diff_y < precision_range:
                     self.init_position = torch.tensor(device_state.position[:2])
                     self.pre_button = False

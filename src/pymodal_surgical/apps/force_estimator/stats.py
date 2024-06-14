@@ -3,26 +3,23 @@ from pathlib import Path
 from scipy import signal
 from scipy.spatial.distance import euclidean
 from fastdtw import fastdtw
+import matplotlib.pyplot as plt
 
 
 def isnormalized(data: np.ndarray) -> bool:
-    return data.mean(axis=0) == 0
+    return data.mean() == 0
 
 
 def shift_signal(signal1: np.ndarray, signal2: np.ndarray, optimal_lag: int) -> np.ndarray:
     
-    if optimal_lag > 0:
-        shifted_signal2 = np.pad(signal2, (optimal_lag, 0), 'constant', constant_values=(0, 0))[:len(signal1)]
-    elif optimal_lag < 0:
-        shifted_signal2 = np.pad(signal2, (0, -optimal_lag), 'constant', constant_values=(0, 0))[-len(signal1):]
-    else:
-        shifted_signal2 = signal2
-    
-    min_length = min(len(signal1), len(shifted_signal2))
-    signal1 = signal1[:min_length]
-    shifted_signal2 = shifted_signal2[:min_length]
+    shifted_signal1 = np.roll(signal1, optimal_lag, axis=0)
 
-    return shifted_signal2
+    # Truncate both signals to the minimum length
+    min_length = min(len(signal2), len(shifted_signal1))
+    shifted_signal1 = shifted_signal1[:min_length]
+    signal2 = signal2[:min_length]
+
+    return shifted_signal1, signal2
 
 
 class Statistics:
@@ -41,6 +38,7 @@ class Statistics:
             "cosine": self.cosine_sim
         }
     
+
     def __call__(
         self, 
         real_data: np.ndarray, 
@@ -51,29 +49,32 @@ class Statistics:
             real_data = (real_data - real_data.mean(axis=0)) / (real_data.std(axis=0) + 1e-6)
         
         if not isnormalized(prediction):
-            prediction = (prediction - prediction.mean(axis=0)) / (prediction.std(axis=0) / 1e-6)
+            prediction = (prediction - prediction.mean(axis=0)) / (prediction.std(axis=0) + 1e-6)
         
-        if len(real_data) != prediction:
+        if len(real_data) != len(prediction):
             real_data = signal.resample(real_data, prediction.shape[0], axis=0)
         
         # Transform the data to be aligned with the image-space predictions
-        real_data = real_data[:, [2, 1, 0]]
-        real_data = real_data[:, :2]
+        # real_data = real_data[:, [2, 1, 0]]
+        real_data = -real_data[:, 2]
+        prediction = prediction[:, 0]
 
         statistics = {}
         
         if "cross_correlation" in self.statistics_list:
-            idx = self.statistics_list.index("cross_correlation")
+            cross_idx = self.statistics_list.index("cross_correlation")
             statistics["cross_correlation"], optimal_lag = self.cross_correlation(real_data, prediction)
-            self.statistics_list.pop(idx)
         
         else:
             optimal_lag = 0
 
-        for stat in self.statistics_list:
+        for i, stat in enumerate(self.statistics_list):
+            if i == cross_idx:
+                continue
+            
             statistics[stat] = self.statistics[stat](real_data, prediction, optimal_lag)
-
         return statistics
+    
     
     @staticmethod
     def rmse(
@@ -82,8 +83,8 @@ class Statistics:
         optimal_lag: int = 0
     ) -> float:
         
-       shifted_pred = shift_signal(real_data, prediction, optimal_lag)
-       errors = real_data - shifted_pred
+       shifted_real, prediction = shift_signal(real_data, prediction, optimal_lag)
+       errors = shifted_real - prediction
        squared_errors = errors ** 2
        mean_squared_error = np.mean(squared_errors)
        rmse = np.sqrt(mean_squared_error)
@@ -94,10 +95,10 @@ class Statistics:
         real_data: np.ndarray,
         prediction: np.ndarray,
         optimal_lag: int = 0
-    ) -> dict[str, float]:
+    ) -> float:
         
-        shifted_pred = shift_signal(real_data, prediction, optimal_lag)
-        abs_errors = np.abs(real_data - shifted_pred)
+        shifted_real, prediction = shift_signal(real_data, prediction, optimal_lag)
+        abs_errors = np.abs(shifted_real - prediction)
         mae = np.mean(abs_errors)
         return mae   
 
@@ -105,11 +106,11 @@ class Statistics:
     def cross_correlation(
         real_data: np.ndarray, 
         prediction: np.ndarray
-    ) -> dict[str, float]:
+    ) -> tuple[float, int]:
         
         # Compute the cross-correlation
-        corr = np.correlate(prediction[:, 0], real_data[:, 0], mode="full")
-        normalized_corr = corr / (np.sqrt(np.sum(prediction[:, 0] ** 2) * np.sum(real_data[:, 0] ** 2)) + 1e-6)
+        corr = np.correlate(prediction[:], real_data[:], mode="full")
+        normalized_corr = corr / (np.sqrt(np.sum(prediction[:] ** 2) * np.sum(real_data[:] ** 2)) + 1e-6)
 
         lags = np.arange(-real_data.shape[0] + 1, real_data.shape[0])
 
@@ -124,10 +125,10 @@ class Statistics:
         real_data: np.ndarray,
         prediction: np.ndarray,
         optimal_lag: int = 0
-    ) -> dict[str, float]:
+    ) -> float:
         
-        shifted_pred = shift_signal(real_data, prediction, optimal_lag)
-        frac_error = np.abs((real_data - shifted_pred) / real_data)
+        shifted_real, prediction = shift_signal(real_data, prediction, optimal_lag)
+        frac_error = np.abs((shifted_real[:] - prediction[:]) / shifted_real[:])
         mape = np.mean(frac_error) * 100
         return mape
     
@@ -136,9 +137,10 @@ class Statistics:
         real_data: np.ndarray,
         prediction: np.ndarray,
         optimal_lag: int = 0
-    ) -> dict[str, float]:
+    ) -> float:
         
-        shifted_pred = shift_signal(real_data, prediction, optimal_lag)
+        shifted_pred, prediction = shift_signal(real_data, prediction, optimal_lag)
+        print(real_data.shape, shifted_pred.shape)
         distance, path = fastdtw(real_data, shifted_pred, dist=euclidean)
         return distance
     
@@ -148,14 +150,14 @@ class Statistics:
         real_data: np.ndarray,
         prediction: np.ndarray,
         optimal_lag: int = 0
-    ) -> dict[str, float]:
+    ) -> float:
         
-        shifted_pred = shift_signal(real_data, prediction, optimal_lag)
-        dot_product = np.dot(real_data, shifted_pred)
+        shifted_real, prediction = shift_signal(real_data, prediction, optimal_lag)
+        dot_product = np.dot(shifted_real, prediction)
 
         # Calculate the L2 norms of the data
-        norm_real_data = np.linalg.norm(real_data)
-        norm_pred = np.linalg.norm(shifted_pred)
+        norm_real_data = np.linalg.norm(shifted_real)
+        norm_pred = np.linalg.norm(prediction)
 
         # Calculate the cosine similarity
         cosine_similarity = dot_product / (norm_real_data * norm_pred)
