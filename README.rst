@@ -6,12 +6,21 @@ This repository contains the source code for the pymodal_surgical package. This 
 
 Installation
 -------------
-To install the package, clone the repository and run the following commands in the root directory. I highly recommend using a designated *conda* environment as the package requires multiple dependencies. You can see a tutorial on how to setup an environment in `here <https://github.com/mikelitu/cheat-sheets/tree/main/Python-VSCode>`_:
+To install the package in your personal project, run the following command:
+
+.. code:: sh
+
+    pip insall git+https://github.com/mikelitu/surgical-video-modal-analysis.git
+
+Building
+-------------
+To build the package, clone the repository and run the following commands in the root directory. I highly recommend using a designated *conda* environment as the package requires multiple dependencies. You can see a tutorial on how to setup an environment in `here <https://github.com/mikelitu/cheat-sheets/tree/main/Python-VSCode>`_:
 
 .. code:: sh
 
     python -m build
     pip install ./dist/pymodal_surgical-0.1.0.tar.gz
+
 
 
 Applications
