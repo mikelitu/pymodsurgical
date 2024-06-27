@@ -7,11 +7,33 @@ import matplotlib.pyplot as plt
 
 
 def isnormalized(data: np.ndarray) -> bool:
+    """
+    Check if the given data is normalized.
+
+    A data array is considered normalized if its mean is equal to zero.
+
+    Args:
+        data (np.ndarray): The data array to check.
+
+    Returns:
+        bool: True if the data is normalized, False otherwise.
+    """
     return data.mean() == 0
 
 
-def shift_signal(signal1: np.ndarray, signal2: np.ndarray, optimal_lag: int) -> np.ndarray:
-    
+def shift_signal(signal1: np.ndarray, signal2: np.ndarray, optimal_lag: int) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Shift the first signal by the optimal lag and truncate both signals to the same length.
+
+    Args:
+        signal1 (np.ndarray): The first signal array.
+        signal2 (np.ndarray): The second signal array.
+        optimal_lag (int): The number of positions to shift the first signal.
+
+    Returns:
+        np.ndarray: The shifted and truncated first signal.
+        np.ndarray: The truncated second signal.
+    """
     shifted_signal1 = np.roll(signal1, optimal_lag, axis=0)
 
     # Truncate both signals to the minimum length
@@ -23,11 +45,23 @@ def shift_signal(signal1: np.ndarray, signal2: np.ndarray, optimal_lag: int) -> 
 
 
 class Statistics:
+    """
+    A class to calculate various statistical metrics between real data and predictions.
+
+    Attributes:
+        statistics_list (list[str]): List of statistical metrics to compute.
+        statistics (dict): Dictionary mapping metric names to their corresponding methods.
+    """
     def __init__(
         self,
         statistics_config_list: list[str],
     ) -> None:
-        
+        """
+        Initialize the Statistics class.
+
+        Args:
+            statistics_config_list (list[str]): List of statistical metrics to compute.
+        """
         self.statistics_list = statistics_config_list
         self.statistics = {
             "cross_correlation": self.cross_correlation, 
@@ -44,7 +78,16 @@ class Statistics:
         real_data: np.ndarray, 
         prediction: np.ndarray
     ) -> dict[str, float]:
-        
+        """
+        Calculate the specified statistical metrics between real data and predictions.
+
+        Args:
+            real_data (np.ndarray): The real data array.
+            prediction (np.ndarray): The prediction array.
+
+        Returns:
+            dict[str, float]: A dictionary with metric names as keys and their computed values as values.
+        """
         if not isnormalized(real_data):
             real_data = (real_data - real_data.mean(axis=0)) / (real_data.std(axis=0) + 1e-6)
         
@@ -82,13 +125,23 @@ class Statistics:
         prediction: np.ndarray,
         optimal_lag: int = 0
     ) -> float:
-        
-       shifted_real, prediction = shift_signal(real_data, prediction, optimal_lag)
-       errors = shifted_real - prediction
-       squared_errors = errors ** 2
-       mean_squared_error = np.mean(squared_errors)
-       rmse = np.sqrt(mean_squared_error)
-       return rmse
+        """
+        Calculate the Root Mean Squared Error (RMSE) between real data and prediction.
+
+        Args:
+            real_data (np.ndarray): The real data array.
+            prediction (np.ndarray): The prediction array.
+            optimal_lag (int): The lag to shift the real data. Default is 0.
+
+        Returns:
+            float: The RMSE value.
+        """ 
+        shifted_real, prediction = shift_signal(real_data, prediction, optimal_lag)
+        errors = shifted_real - prediction
+        squared_errors = errors ** 2
+        mean_squared_error = np.mean(squared_errors)
+        rmse = np.sqrt(mean_squared_error)
+        return rmse
     
     @staticmethod
     def mae(
@@ -96,7 +149,17 @@ class Statistics:
         prediction: np.ndarray,
         optimal_lag: int = 0
     ) -> float:
-        
+        """
+        Calculate the Mean Absolute Error (MAE) between real data and prediction.
+
+        Args:
+            real_data (np.ndarray): The real data array.
+            prediction (np.ndarray): The prediction array.
+            optimal_lag (int): The lag to shift the real data. Default is 0.
+
+        Returns:
+            float: The MAE value.
+        """
         shifted_real, prediction = shift_signal(real_data, prediction, optimal_lag)
         abs_errors = np.abs(shifted_real - prediction)
         mae = np.mean(abs_errors)
@@ -107,7 +170,16 @@ class Statistics:
         real_data: np.ndarray, 
         prediction: np.ndarray
     ) -> tuple[float, int]:
-        
+        """
+        Calculate the cross-correlation between real data and prediction.
+
+        Args:
+            real_data (np.ndarray): The real data array.
+            prediction (np.ndarray): The prediction array.
+
+        Returns:
+            tuple[float, int]: The maximum correlation value and the optimal lag.
+        """
         # Compute the cross-correlation
         corr = np.correlate(prediction[:], real_data[:], mode="full")
         normalized_corr = corr / (np.sqrt(np.sum(prediction[:] ** 2) * np.sum(real_data[:] ** 2)) + 1e-6)
@@ -126,7 +198,17 @@ class Statistics:
         prediction: np.ndarray,
         optimal_lag: int = 0
     ) -> float:
-        
+        """
+        Calculate the Mean Absolute Percentage Error (MAPE) between real data and prediction.
+
+        Args:
+            real_data (np.ndarray): The real data array.
+            prediction (np.ndarray): The prediction array.
+            optimal_lag (int): The lag to shift the real data. Default is 0.
+
+        Returns:
+            float: The MAPE value.
+        """
         shifted_real, prediction = shift_signal(real_data, prediction, optimal_lag)
         frac_error = np.abs((shifted_real[:] - prediction[:]) / shifted_real[:])
         mape = np.mean(frac_error) * 100
@@ -138,7 +220,17 @@ class Statistics:
         prediction: np.ndarray,
         optimal_lag: int = 0
     ) -> float:
-        
+        """
+        Calculate the Dynamic Time Warping (DTW) distance between real data and prediction.
+
+        Args:
+            real_data (np.ndarray): The real data array.
+            prediction (np.ndarray): The prediction array.
+            optimal_lag (int): The lag to shift the real data. Default is 0.
+
+        Returns:
+            float: The DTW distance.
+        """
         shifted_pred, prediction = shift_signal(real_data, prediction, optimal_lag)
         print(real_data.shape, shifted_pred.shape)
         distance, path = fastdtw(real_data, shifted_pred, dist=euclidean)
@@ -151,7 +243,17 @@ class Statistics:
         prediction: np.ndarray,
         optimal_lag: int = 0
     ) -> float:
-        
+        """
+        Calculate the cosine similarity between real data and prediction.
+
+        Args:
+            real_data (np.ndarray): The real data array.
+            prediction (np.ndarray): The prediction array.
+            optimal_lag (int): The lag to shift the real data. Default is 0.
+
+        Returns:
+            float: The cosine similarity value.
+        """
         shifted_real, prediction = shift_signal(real_data, prediction, optimal_lag)
         dot_product = np.dot(shifted_real, prediction)
 

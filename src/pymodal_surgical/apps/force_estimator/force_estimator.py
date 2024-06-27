@@ -21,12 +21,36 @@ device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("
 
 class ForceEstimator():
 
+    """
+    A class to estimate and visualize forces from video data using optical flow and mode shapes.
+
+    Attributes:
+        mode_shapes (torch.Tensor): The complex mode shapes calculated from the mode shape configuration.
+        frequencies (torch.Tensor): The frequencies corresponding to the mode shapes.
+        fps (int): Frames per second of the video.
+        filter (GaussianFiltering): Gaussian filter applied to the forces.
+        save_force (bool): Flag indicating whether to save the estimated forces.
+        force_save_path (str): Path to save the force video.
+        force_video_writer (cv2.VideoWriter): Writer object for saving force video.
+        force_mask (torch.Tensor): Mask for blending force with frames.
+        pixels (tuple): Region of interest for force estimation.
+        force_video_reader (VideoReader): Reader object for the input video.
+        flow_model: Model for estimating optical flow.
+    """
+    
     def __init__(
         self,
         force_estimation_config: dict,
         mode_shape_config: dict,
     ) -> None:
         
+        """
+        Initialize the ForceEstimator.
+
+        Args:
+            force_estimation_config (dict): Configuration for force estimation.
+            mode_shape_config (dict): Configuration for mode shape calculation.
+        """
         mode_shape_calculator = ModeShapeCalculator(mode_shape_config)
 
         self.mode_shapes = mode_shape_calculator.complex_mode_shapes
@@ -61,7 +85,12 @@ class ForceEstimator():
         self,
         force_estimation_config: dict
     ) -> None:
-        
+        """
+        Load the force video based on the given configuration.
+
+        Args:
+            force_estimation_config (dict): Configuration for force estimation.
+        """
         self.force_video_reader = VideoReader(video_config=force_estimation_config)
         self.flow_model = optical_flow.load_flow_model(device)
         
@@ -75,7 +104,12 @@ class ForceEstimator():
         self,
         size: tuple[int, int] = (128, 128)
     ) -> None:
-        
+        """
+        Create a mask for blending forces with video frames.
+
+        Args:
+            size (tuple[int, int]): Size of the mask (height, width). Default is (128, 128).
+        """
         self.force_mask = torch.zeros((2, *size), dtype=torch.float32)
     
 
@@ -84,15 +118,20 @@ class ForceEstimator():
         frame: np.ndarray,
         force: torch.Tensor,
     ) -> np.ndarray:
-        
-        # force = force.numpy()
+        """
+        Blend a video frame with the estimated force.
+
+        Args:
+            frame (np.ndarray): The video frame.
+            force (torch.Tensor): The estimated force.
+
+        Returns:
+            np.ndarray: The blended frame.
+        """
         self.force_mask[:, self.pixels[0][0]:self.pixels[0][1], self.pixels[1][0]:self.pixels[1][1]] = force.transpose(2, 1)
-        print(self.force_mask.max(), self.force_mask.min())
-        # force_mask = cv2.normalize(self.force_mask, None, 0, 255, cv2.NORM_MINMAX)
         force_mask = flow_to_image(self.force_mask)
         force_mask = force_mask.permute(1, 2, 0).numpy().astype(np.uint8)
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        # force = cv2.applyColorMap(force.astype(np.uint8), cv2.COLORMAP_JET)
         frame = cv2.addWeighted(frame, 0.7, force_mask, 0.3, 0)
         return frame
 
@@ -102,15 +141,21 @@ class ForceEstimator():
         frame: np.ndarray,
         force: torch.Tensor,
     ) -> np.ndarray:
-        
+        """
+        Blend a video frame with a quiver plot of the estimated force.
+
+        Args:
+            frame (np.ndarray): The video frame.
+            force (torch.Tensor): The estimated force.
+
+        Returns:
+            np.ndarray: The blended frame with a quiver plot.
+        """
         gd = 20
         Y, X = np.mgrid[0:frame.shape[0]:gd, 0:frame.shape[1]:gd]
         self.force_mask[:, self.pixels[0][0]:self.pixels[0][1], self.pixels[1][0]:self.pixels[1][1]] = force
         V = self.force_mask[0, ::gd, ::gd].numpy()
         U = self.force_mask[1, ::gd, ::gd].numpy()
-
-        # frame = cv2.resize(frame, (128, 128))
-        # frame_slice = frame[::gd, ::gd]
 
         dpi = 100
         figsize = (frame.shape[0] / dpi, frame.shape[1] / dpi)
@@ -129,7 +174,6 @@ class ForceEstimator():
         image = np.frombuffer(canvas.tostring_rgb(), dtype="uint8").reshape(int(height), int(width), 3)
         
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-        # image = cv2.resize(image, (128, 128))
         # Release the figure resources (important to avoid memory issues)
         plt.close(fig)
 
@@ -140,6 +184,12 @@ class ForceEstimator():
         self,
         frame: np.ndarray,
     ) -> None:
+        """
+        Display a video frame.
+
+        Args:
+            frame (np.ndarray): The video frame.
+        """
         cv2.imshow("Frame", frame)
         cv2.waitKey(0)
 
@@ -148,7 +198,15 @@ class ForceEstimator():
         self,
         frame: np.ndarray,
     ) -> tuple[int, int]:
-        
+        """
+        Select a region of interest (ROI) from the video frame.
+
+        Args:
+            frame (np.ndarray): The video frame.
+
+        Returns:
+            tuple[int, int]: The selected ROI as (x, y, width, height).
+        """
         frame = cv2.resize(frame, (self.mode_shapes.shape[3], self.mode_shapes.shape[2]))
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
         bbox = cv2.selectROI("Frame", frame, fromCenter=True)
@@ -161,7 +219,17 @@ class ForceEstimator():
         idx_2: int,
         simplify_force: bool = False,
     ) -> torch.Tensor:
-        
+        """
+        Calculate the force between two video frames.
+
+        Args:
+            idx_1 (int): Index of the first frame.
+            idx_2 (int): Index of the second frame.
+            simplify_force (bool): Flag indicating whether to simplify the force calculation. Default is False.
+
+        Returns:
+            torch.Tensor: The estimated force.
+        """
         # Load the frames
         if self.force_video_reader.video_type == "stereo":
             frame_1 = self.force_video_reader.read_frame(idx_1)[0]
@@ -184,11 +252,7 @@ class ForceEstimator():
 
         # Calculate the optical flow
         flow = optical_flow.estimate_flow(self.flow_model, processed_frame_1, processed_frame_2)
-        
-        # flow = self.filter(processed_frame_2, flow.detach().cpu())
         flow = flow.squeeze(0).detach().cpu()
-        # norm_flow = flow / flow.norm(dim=1, keepdim=True)
-        # flow = norm_flow.squeeze(0).detach().cpu()
 
         # The optical flow corresponds to the desired displacement of the pixels
         # We need to calculate the force that is applied to the pixels
@@ -204,11 +268,9 @@ class ForceEstimator():
 
             if simplify_force:
                 raise ValueError("Cannot save simplified force to plot as a video grid")
-            
-            # Normalized force for display
-            # constraint_force = constraint_force / constraint_force.norm(dim=0, keepdim=True)
 
             blended_force = self._blend_quiver_with_frame(frame_2, constraint_force)
             self.force_video_writer.write(blended_force)
 
         return constraint_force
+
