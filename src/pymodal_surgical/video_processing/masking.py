@@ -7,6 +7,23 @@ from .reader import VideoType
 
 
 class Masking(object):
+    """
+    A class for applying masks to video frames.
+
+    Args:
+        mask_path (PosixPath | Path | str): The path to the mask file.
+        video_type (VideoType, optional): The type of video. Defaults to VideoType.MONO.
+
+    Attributes:
+        mask (np.ndarray): The loaded mask.
+        width (int): The width of the mask.
+        height (int): The height of the mask.
+        left_mask (np.ndarray): The left half of the mask (for stereo videos).
+        right_mask (np.ndarray): The right half of the mask (for stereo videos).
+        video_type (VideoType): The type of video.
+
+    """
+
     def __init__(
         self, 
         mask_path: PosixPath | Path | str,
@@ -30,9 +47,27 @@ class Masking(object):
         self.video_type = video_type
     
     def _split_mask(self) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Split the mask into left and right halves (for stereo videos).
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: The left and right halves of the mask.
+
+        """
         return self.mask[..., :self.width // 2], self.mask[..., self.width // 2:]
     
     def _check_stereo(self, camera_pos: str | None = None) -> None:
+        """
+        Check if the video is stereo and set the mask accordingly.
+
+        Args:
+            camera_pos (str | None, optional): The camera position. Defaults to None.
+
+        Raises:
+            ValueError: If camera position is not specified for stereo video.
+            ValueError: If camera position is not 'left' or 'right'.
+
+        """
         if camera_pos is None:
             raise ValueError("Camera position must be specified for stereo video")
         if camera_pos == "left":
@@ -43,10 +78,30 @@ class Masking(object):
             raise ValueError("Camera position must be either 'left' or 'right'")
 
     def apply_mask(self, frames: np.ndarray | torch.Tensor) -> np.ndarray | torch.Tensor:
+        """
+        Apply the mask to the frames.
+
+        Args:
+            frames (np.ndarray | torch.Tensor): The frames to apply the mask to.
+
+        Returns:
+            np.ndarray | torch.Tensor: The masked frames.
+
+        """
         return frames * self.mask[None, None, ...]
     
     def __call__(self, frames: np.ndarray | torch.Tensor, camera_pos: str | None = None) -> np.ndarray | torch.Tensor:
-        
+        """
+        Apply the mask to the frames.
+
+        Args:
+            frames (np.ndarray | torch.Tensor): The frames to apply the mask to.
+            camera_pos (str | None, optional): The camera position. Defaults to None.
+
+        Returns:
+            np.ndarray | torch.Tensor: The masked frames.
+
+        """
         if self.video_type == VideoType.STEREO:
             self._check_stereo(camera_pos)
         
@@ -64,6 +119,13 @@ class Masking(object):
     
     @property
     def masking(self) -> np.ndarray:
+        """
+        Get the mask.
+
+        Returns:
+            np.ndarray: The mask.
+
+        """
         if self.video_type == VideoType.STEREO:
             return self.left_mask
         else:
@@ -71,6 +133,16 @@ class Masking(object):
 
     @staticmethod
     def _load_mask(mask_path: PosixPath | str) -> np.ndarray:
+        """
+        Load the mask from the given path.
+
+        Args:
+            mask_path (PosixPath | str): The path to the mask file.
+
+        Returns:
+            np.ndarray: The loaded mask.
+
+        """
         if isinstance(mask_path, PosixPath) or isinstance(mask_path, Path):
             mask_path = str(mask_path)
         
