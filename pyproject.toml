@@ -9,7 +9,7 @@ description = "A Python package for surgical modal analysis"
 authors = [
     {name = "Mikel De Iturrate Reyzabal", email = "mikel.de_iturrate_reyzabal@kcl.ac.uk"},
 ]
-readme = {file = "README.rst", content-type = "text/x-rst"}
+readme = {file = "README.md", content-type = "text/markdown"}
 license = "MIT"
 requires-python = ">= 3.9"
 classifiers = [
