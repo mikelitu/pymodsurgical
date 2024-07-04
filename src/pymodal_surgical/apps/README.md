@@ -45,10 +45,10 @@ You can check the source code at [force_estimator](force_estimator).
 
 This applications allows to create single image interactive demo, that can be controlled using either the mouse or a haptic device (*Touch X*). The simulation provides at the moment a single pixel direct manipulation and an *ODE Euler Solver* to handle the transition to resting state after a force is applied. The application contains the following flags:
 
-* **demo_config**: This is a *.json* file that contains all the variables to initiate the interactive demo. There is no *ModeShapeCalculator* integration at the moment so it would not load the data from a cached directory. This file can be manually created or generated using with the *Video Analysis* application available for this package.
+* **config**: This is a *.json* file that contains all the variables to initiate the interactive demo. There is no *ModeShapeCalculator* integration at the moment so it would not load the data from a cached directory. This file can be manually created or generated using with the *Video Analysis* application available for this package.
 
 ```sh
-python -m pymodal_surgical.apps.interactive_demo --demo-config <path-to-config-file>
+python -m pymodal_surgical.apps.interactive_demo --config <path-to-config-file>
 ```
 
 You can check the source code at [interactive_demo](interactive_demo).

@@ -4,6 +4,7 @@ from pathlib import Path
 import torch
 from .reader import VideoType
 from torchvision.utils import flow_to_image
+from ..utils import create_save_dir
 
 
 class VideoWriter(object):
@@ -44,6 +45,8 @@ class VideoWriter(object):
         video_path = video_config["video_path"]
         if not isinstance(video_path, Path):
             video_path = Path(video_path)
+
+        video_path = create_save_dir(video_path.parent, video_path.name)
 
         self.video_path = video_path
         self.video_config = video_config
