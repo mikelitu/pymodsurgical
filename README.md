@@ -56,7 +56,7 @@ rm data.zip
 Testing
 --------
 
-This platform has been tested with custom videos and openly available real surgical videos from the Hamlyn Centre Laparoscopic / Endoscopic Video Dataset `[2]`. The videos are not included in the repository, but can be downloaded from the `official website <https://hamlyn.doc.ic.ac.uk/vision/>`_.
+This platform has been tested with custom videos and openly available real surgical videos from the Hamlyn Centre Laparoscopic / Endoscopic Video Dataset `[2]`. The videos are not included in the repository, but can be downloaded from the [official website]( https://hamlyn.doc.ic.ac.uk/vision/).
 
 The package has been tested on **Ubuntu 20.04** and **Windows 10** with **Python 3.11**. The package has not been tested on other platforms or Python versions.
 
