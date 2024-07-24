@@ -1,0 +1,38 @@
+{
+    "mode_shape_calculator": {
+        "video_path": "data/videos/heart_beating.mp4",
+        "fps": 24,
+        "video_type": "mono",
+        "batch_size": 50,
+        "start": 0,
+        "end": 0,
+        "K": 16,
+        "filtering": {
+            "enabled": true,
+            "sigma": 3.0,
+            "size": 21
+        },
+        "masking": {
+            "enabled": true,
+            "mask": "data/mask/heart_beating.png"
+        }
+    },
+
+    "video_writer": {
+        "video_path": "data/results/heart_beating_solver.mp4",
+        "fps": 100,
+        "video_type": "mono"
+    },
+
+    "video_generator": {
+        "time": 15.0,
+        "interact": 0.1,
+        "pixel": [180, 144],
+        "crop": [20, 20],
+        "force": [0.0, -1.5],
+        "dt": 0.01,
+        "mass": 1.0,
+        "rayleigh_mass": 0.1,
+        "rayleigh_stiffness": 0.1 
+    }
+}

@@ -1,0 +1,34 @@
+{
+    "mode_shape_calculator": {
+        "video_path": "data/videos/liver_stereo.avi",
+        "fps": 24,
+        "video_type": "stereo",
+        "batch_size": 50,
+        "start": 0,
+        "end": 0,
+        "K": 16,
+        "filtering": {
+            "enabled": true,
+            "sigma": 4.0,
+            "size": 17
+        },
+        "masking": {
+            "enabled": true,
+            "mask": "data/mask/liver_stereo.png"
+        }
+    },
+
+    "video_generator": {
+        "video_path": "data/results",
+        "video_type": "mono",
+        "time": 60.0,
+        "interact": 0.1,
+        "pixel": [180, 144],
+        "crop": [20, 20],
+        "force": [0.0, -100.0],
+        "dt": 0.01,
+        "mass": 10.0,
+        "rayleigh_mass": 0.1,
+        "rayleigh_stiffness": 0.1 
+    }
+}

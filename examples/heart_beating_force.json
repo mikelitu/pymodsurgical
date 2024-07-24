@@ -1,0 +1,30 @@
+{
+    "mode_shapes_config": {
+        "video_path": "data/videos/heart_beating.avi",
+        "fps": 24,
+        "video_type": "mono",
+        "batch_size": 50,
+        "start": 0,
+        "end": 0,
+        "K": 16,
+        "filtering": {
+            "enabled": true,
+            "sigma": 3.0,
+            "size": 15
+        },
+        "masking": {
+            "enabled": true,
+            "mask": "data/mask/heart_beating.png"
+        }
+    },
+
+    "force_estimation_config": {
+        "video_path": "data/videos/heart_beating.avi",
+        "fps": 24,
+        "video_type": "stereo",
+        "start": 0,
+        "end": 200,
+        "mode": "simple",
+        "save_force": "results/"
+    }
+}

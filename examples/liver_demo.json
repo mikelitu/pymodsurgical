@@ -1,0 +1,32 @@
+{
+    "mode_shape_config": {
+        "video_path": "data/videos/liver_stereo.avi",
+        "fps": 24,
+        "video_type": "stereo",
+        "batch_size": 50,
+        "start": 0,
+        "end": 0,
+        "K": 16,
+        "filtering": {
+            "enabled": true,
+            "sigma": 4.0,
+            "size": 17
+        },
+        "masking": {
+            "enabled": true,
+            "mask": "data/mask/liver_stereo.png"
+        }
+    },
+
+    "solver_time_step": 0.1,
+    "depth_model_type": "DPT_Large",
+    "norm_scale": 10,
+    "alpha_limit": 6.0,
+    "force_scale": 0.6,
+    "display_cropping": [20, 20],
+    "near": 0.00,
+    "far": 1.0,
+    "inverse": false,
+    "mass": 10.0,
+    "rest_force": 0.0
+}
