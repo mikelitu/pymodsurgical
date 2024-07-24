@@ -19,3 +19,4 @@ python pymodal_surgical.apps.video_generator --config examples/liver_video_gener
 ```shell
 python pymodal_surgical.apps.video_generator --config examples/heart_beating_generator.json
 ```
+
