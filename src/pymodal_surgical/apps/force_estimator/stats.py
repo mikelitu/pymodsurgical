@@ -55,6 +55,7 @@ class Statistics:
     def __init__(
         self,
         statistics_config_list: list[str],
+        axis: int = 0
     ) -> None:
         """
         Initialize the Statistics class.
@@ -62,6 +63,17 @@ class Statistics:
         Args:
             statistics_config_list (list[str]): List of statistical metrics to compute.
         """
+        if axis not in [0, 1]:
+            raise ValueError("Invalid axis value. Axis should be either 0 (u) or 1 (v).")
+        
+        else:
+            if axis == 0:
+                self.axis = 0
+                self.real_axis = 2
+            else:
+                self.axis = 1
+                self.real_axis = 0
+        
         self.statistics_list = statistics_config_list
         self.statistics = {
             "cross_correlation": self.cross_correlation, 
@@ -99,8 +111,8 @@ class Statistics:
         
         # Transform the data to be aligned with the image-space predictions
         # real_data = real_data[:, [2, 1, 0]]
-        real_data = -real_data[:, 2]
-        prediction = prediction[:, 0]
+        real_data = -real_data[:, self.real_axis]
+        prediction = prediction[:, self.axis]
 
         statistics = {}
         
