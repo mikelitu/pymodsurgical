@@ -18,10 +18,10 @@
         }
     },
 
-    "solver_time_step": 0.1,
+    "solver_time_step": 0.05,
     "depth_model_type": "DPT_Large",
-    "norm_scale": 10,
-    "alpha_limit": 6.0,
+    "norm_scale": 50,
+    "alpha_limit": 2.0,
     "force_scale": 0.6,
     "display_cropping": [20, 20],
     "near": 0.00,
